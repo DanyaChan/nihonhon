@@ -139,6 +139,60 @@ function paginate() {
     page.step = width + PAGE_GAP;
     page.total = Math.max(1, Math.round((els.flow.scrollWidth + PAGE_GAP) / page.step));
   }
+
+  schedulePageMap(width, height);
+}
+
+// ---------- сквозная нумерация страниц ----------
+// Число страниц каждой главы считается в фоне в скрытом контейнере
+// с теми же параметрами вёрстки; пересчитывается при смене шрифта,
+// размеров, ширины области или направления текста.
+
+let pageMap = null;    // [страниц в главе 0, 1, ...]
+let pageMapSig = "";   // сигнатура вёрстки, для которой посчитан pageMap
+let pageMapToken = 0;
+
+function schedulePageMap(width, height) {
+  const sig = [state.bookId, width, height, verticalMode,
+    getComputedStyle(els.flow).fontSize].join("|");
+  if (sig === pageMapSig) return;
+  pageMapSig = sig;
+  buildPageMap(width, height);
+}
+
+async function buildPageMap(width, height) {
+  const token = ++pageMapToken;
+  pageMap = null;
+  if (width <= 0 || height <= 0) return;
+
+  const meas = document.createElement("div");
+  meas.className = "flow flow-measure" + (verticalMode ? " vertical" : "");
+  meas.style.width = width + "px";
+  meas.style.height = height + "px";
+  meas.style.columnWidth = (verticalMode ? height : width) + "px";
+  document.body.appendChild(meas);
+
+  const step = (verticalMode ? height : width) + PAGE_GAP;
+  const counts = [];
+  try {
+    for (const chapter of state.chapters) {
+      const node = await chapter.render();
+      if (token !== pageMapToken) return; // вёрстка успела измениться
+      meas.innerHTML = "";
+      meas.appendChild(node);
+      await Promise.all([...meas.querySelectorAll("img")].map((img) =>
+        img.complete ? null : new Promise((res) => {
+          img.onload = img.onerror = res;
+        })));
+      if (token !== pageMapToken) return;
+      const size = verticalMode ? meas.scrollHeight : meas.scrollWidth;
+      counts.push(Math.max(1, Math.round((size + PAGE_GAP) / step)));
+    }
+  } finally {
+    meas.remove();
+  }
+  pageMap = counts;
+  updateInfo();
 }
 
 function goToPage(i) {
@@ -179,6 +233,15 @@ function repaginate() {
 }
 
 function updateInfo() {
+  // Сквозная нумерация страниц по всей книге, когда она уже посчитана
+  if (!scrollMode && pageMap && pageMap.length === state.chapters.length) {
+    let before = 0;
+    for (let i = 0; i < state.current; i++) before += pageMap[i];
+    const total = pageMap.reduce((a, b) => a + b, 0);
+    els.chapterInfo.textContent =
+      Math.min(before + page.current + 1, total) + " / " + total + "頁";
+    return;
+  }
   let text = (state.current + 1) + " / " + state.chapters.length;
   if (!scrollMode && page.total > 1) {
     text += " ・ " + (page.current + 1) + "/" + page.total + "頁";

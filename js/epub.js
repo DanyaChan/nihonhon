@@ -65,15 +65,8 @@ async function openEpub(file) {
   }
   if (!spinePaths.length) throw new Error("Некорректный EPUB: пустой spine");
 
-  // 3. Названия глав из nav.xhtml или toc.ncx;
-  // если в оглавлении главы нет — берём первую строку её текста
+  // 3. Названия глав из nav.xhtml или toc.ncx
   const titles = await loadTocTitles(zip, opf, manifest);
-  for (const path of spinePaths) {
-    if (!titles.has(path)) {
-      const t = await firstLineTitle(zip, path);
-      if (t) titles.set(path, t);
-    }
-  }
   const pathToIndex = new Map(spinePaths.map((p, i) => [p, i]));
 
   const chapters = spinePaths.map((path, i) => ({
@@ -122,25 +115,6 @@ async function loadTocTitles(zip, opf, manifest) {
     console.warn("Не удалось прочитать оглавление:", e);
   }
   return titles;
-}
-
-// Первая строка текста главы — для заголовка в оглавлении.
-// Без DOMParser: срезаем теги регулярками, этого достаточно для заголовка.
-async function firstLineTitle(zip, path) {
-  try {
-    let html = await zip.extractText(path);
-    const body = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    if (body) html = body[1];
-    const text = html
-      .replace(/<(rt|rp)[^>]*>[\s\S]*?<\/\1>/gi, "") // фуригану — вон
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&[a-z#0-9]+;/gi, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return text ? clipTitle(text) : null;
-  } catch {
-    return null;
-  }
 }
 
 // ---------- отрисовка главы ----------
