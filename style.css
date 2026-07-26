@@ -1,0 +1,239 @@
+:root {
+  --bg: #faf7f0;
+  --fg: #2b2a27;
+  --muted: #8a857a;
+  --accent: #b3452f;
+  --panel: #f1ece1;
+  --border: #ddd6c8;
+  --content-font-size: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+               "Noto Sans JP", "Meiryo", sans-serif;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- toolbar ---------- */
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#toolbar .spacer {
+  flex: 1;
+}
+
+#book-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50vw;
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- layout ---------- */
+
+#layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+#toc {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 14px;
+}
+
+#toc h2 {
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+
+#toc-list {
+  list-style: none;
+}
+
+#toc-list li {
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#toc-list li:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+#toc-list li.active {
+  background: var(--bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- reader ---------- */
+
+#reader {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+#welcome {
+  max-width: 480px;
+  margin: 15vh auto 0;
+  text-align: center;
+  padding: 0 20px;
+}
+
+#welcome h1 {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+#welcome p {
+  margin-bottom: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+#welcome button {
+  margin-top: 16px;
+  font-size: 18px;
+  padding: 10px 24px;
+}
+
+#reader.dragover {
+  outline: 3px dashed var(--accent);
+  outline-offset: -12px;
+}
+
+/* ---------- book content ---------- */
+
+#content {
+  width: min(760px, 100%);
+  height: 100%;
+  padding: 36px 24px;
+  overflow: hidden;
+}
+
+/* Поток текста, разбитый на страницы-колонки; листание — сдвигом transform */
+#flow {
+  height: 100%;
+  column-fill: auto;
+  column-gap: 48px;
+  font-size: var(--content-font-size);
+  line-height: 1.9;
+  overflow-wrap: break-word;
+}
+
+#flow h1, #flow h2, #flow h3 {
+  margin: 0 0 0.7em;
+  line-height: 1.5;
+}
+
+#flow p {
+  margin-bottom: 0.4em;
+  text-indent: 1em;
+}
+
+#flow img, #flow svg {
+  max-width: 100%;
+  max-height: 95%;
+  height: auto;
+  display: block;
+  margin: 0.5em auto;
+}
+
+#flow ruby rt {
+  font-size: 0.5em;
+  color: var(--muted);
+}
+
+#flow a {
+  color: var(--accent);
+}
+
+/* ---------- navbar ---------- */
+
+#navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#chapter-info {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ---------- mobile ---------- */
+
+@media (max-width: 640px) {
+  #toc {
+    position: absolute;
+    z-index: 10;
+    top: 49px;
+    bottom: 0;
+    left: 0;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  }
+
+  #book-title {
+    max-width: 30vw;
+  }
+}

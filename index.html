@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日本本 — читалка японских книг</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header id="toolbar">
+    <button id="btn-toc" title="Оглавление">☰</button>
+    <span id="book-title">日本本</span>
+    <div class="spacer"></div>
+    <button id="btn-font-minus" title="Уменьшить шрифт">A−</button>
+    <button id="btn-font-plus" title="Увеличить шрифт">A＋</button>
+    <button id="btn-open" title="Открыть книгу">📖 Открыть</button>
+    <input type="file" id="file-input" accept=".epub,.txt" hidden>
+  </header>
+
+  <div id="layout">
+    <nav id="toc" class="hidden">
+      <h2>目次</h2>
+      <ul id="toc-list"></ul>
+    </nav>
+
+    <main id="reader">
+      <div id="welcome">
+        <h1>日本本</h1>
+        <p>Читалка книг на японском языке.</p>
+        <p>Откройте файл <strong>.epub</strong> или <strong>.txt</strong>,<br>
+           либо перетащите его сюда.</p>
+        <button id="btn-open-welcome">📖 Открыть книгу</button>
+      </div>
+      <div id="content" class="hidden">
+        <div id="flow"></div>
+      </div>
+    </main>
+  </div>
+
+  <footer id="navbar" class="hidden">
+    <button id="btn-prev">← 前へ</button>
+    <span id="chapter-info"></span>
+    <button id="btn-next">次へ →</button>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
