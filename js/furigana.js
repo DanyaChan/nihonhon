@@ -8,7 +8,8 @@
  * слово разворачивается обратно в текст.
  * ============================================================ */
 
-const KUROMOJI_DICT = "lib/dict/";
+// Путь относительно страницы (index.html), а не текущего скрипта
+const KUROMOJI_DICT = new URL("./lib/dict/", document.baseURI).href;
 
 let furiganaTokenizer = null;
 let furiganaLoading = false;
