@@ -42,17 +42,47 @@ const PAGE_GAP = 48; // должен совпадать с column-gap в CSS
 let verticalMode = false;
 try { verticalMode = localStorage.getItem("nihonhon:vertical") === "1"; } catch {}
 
+// Режим отображения: false — по страницам, true — бесконечный скролл
+let scrollMode = false;
+try { scrollMode = localStorage.getItem("nihonhon:scroll") === "1"; } catch {}
+
 function applyWritingMode() {
   els.flow.classList.toggle("vertical", verticalMode);
   // На кнопке — режим, В КОТОРЫЙ переключит нажатие
   $("btn-mode").textContent = verticalMode ? "横書き" : "縦書き";
+  applyViewMode();
 }
 
 function toggleWritingMode() {
   verticalMode = !verticalMode;
   try { localStorage.setItem("nihonhon:vertical", verticalMode ? "1" : "0"); } catch {}
   applyWritingMode();
-  if (state.current >= 0) repaginate();
+  if (state.current < 0) return;
+  if (scrollMode) showChapter(state.current);
+  else repaginate();
+}
+
+function applyViewMode() {
+  els.reader.classList.toggle("scroll-h", scrollMode && !verticalMode);
+  els.reader.classList.toggle("scroll-v", scrollMode && verticalMode);
+  $("btn-view").textContent = scrollMode ? "ページ" : "スクロール";
+}
+
+function toggleViewMode() {
+  scrollMode = !scrollMode;
+  try { localStorage.setItem("nihonhon:scroll", scrollMode ? "1" : "0"); } catch {}
+  applyViewMode();
+  if (state.current >= 0) showChapter(state.current);
+}
+
+function clearPaginationStyles() {
+  els.flow.style.columnWidth = "";
+  els.flow.style.width = "";
+  els.flow.style.height = "";
+  els.flow.style.transform = "";
+  page.step = 0;
+  page.total = 1;
+  page.current = 0;
 }
 
 function paginate() {
@@ -78,6 +108,7 @@ function paginate() {
 }
 
 function goToPage(i) {
+  if (scrollMode) return;
   page.current = Math.max(0, Math.min(page.total - 1, i));
   const shift = -page.current * page.step;
   els.flow.style.transform = verticalMode
@@ -88,17 +119,26 @@ function goToPage(i) {
 }
 
 function nextPage() {
+  if (scrollMode) {
+    if (state.current < state.chapters.length - 1) showChapter(state.current + 1);
+    return;
+  }
   if (page.current < page.total - 1) goToPage(page.current + 1);
   else if (state.current < state.chapters.length - 1) showChapter(state.current + 1);
 }
 
 function prevPage() {
+  if (scrollMode) {
+    if (state.current > 0) showChapter(state.current - 1);
+    return;
+  }
   if (page.current > 0) goToPage(page.current - 1);
   else if (state.current > 0) showChapter(state.current - 1, { atEnd: true });
 }
 
 // Пересчёт страниц при изменении размеров/шрифта (позицию держим примерно)
 function repaginate() {
+  if (scrollMode) return; // в режиме скролла браузер сам переверстает
   const ratio = page.total > 1 ? page.current / (page.total - 1) : 0;
   paginate();
   goToPage(Math.round(ratio * (page.total - 1)));
@@ -106,7 +146,9 @@ function repaginate() {
 
 function updateInfo() {
   let text = (state.current + 1) + " / " + state.chapters.length;
-  if (page.total > 1) text += " ・ " + (page.current + 1) + "/" + page.total + "頁";
+  if (!scrollMode && page.total > 1) {
+    text += " ・ " + (page.current + 1) + "/" + page.total + "頁";
+  }
   els.chapterInfo.textContent = text;
 }
 
@@ -161,8 +203,101 @@ function loadBook({ id, title, chapters }) {
   showChapter(start, { atPage: startPage });
 }
 
+// ---------- бесконечный скролл ----------
+// Показанная глава кладётся в обёртку .chapter-block; при приближении
+// к концу прокрутки дописывается следующая глава.
+
+let scrollLoadedTo = -1; // индекс последней подгруженной главы
+let appendingChapter = false;
+
+async function appendNextChapter() {
+  if (appendingChapter || scrollLoadedTo + 1 >= state.chapters.length) return;
+  appendingChapter = true;
+  try {
+    const next = scrollLoadedTo + 1;
+    const node = await state.chapters[next].render();
+    const wrap = document.createElement("div");
+    wrap.className = "chapter-block";
+    wrap.dataset.index = next;
+    wrap.appendChild(node);
+    els.flow.appendChild(wrap);
+    scrollLoadedTo = next;
+  } finally {
+    appendingChapter = false;
+  }
+}
+
+// Пока контент короче окна — дозаполняем следующими главами
+async function fillViewport() {
+  for (let guard = 0; guard < 50; guard++) {
+    const r = els.reader;
+    const short = verticalMode
+      ? r.scrollWidth <= r.clientWidth + 200
+      : r.scrollHeight <= r.clientHeight + 200;
+    if (!short || scrollLoadedTo + 1 >= state.chapters.length) break;
+    await appendNextChapter();
+  }
+}
+
+function setTocActive(index) {
+  [...els.tocList.children].forEach((li, i) =>
+    li.classList.toggle("active", i === index));
+}
+
+// Определяем главу у начала видимой области (для инфо, TOC и сохранения)
+function updateVisibleChapter() {
+  const rr = els.reader.getBoundingClientRect();
+  const x = verticalMode ? rr.right - 10 : rr.left + rr.width / 2;
+  const y = verticalMode ? rr.top + rr.height / 2 : rr.top + 10;
+  for (const wrap of els.flow.children) {
+    const r = wrap.getBoundingClientRect();
+    const hit = verticalMode
+      ? r.left <= x && x <= r.right
+      : r.top <= y && y <= r.bottom;
+    if (hit) {
+      const index = Number(wrap.dataset.index);
+      if (index !== state.current) {
+        state.current = index;
+        updateInfo();
+        setTocActive(index);
+      }
+      break;
+    }
+  }
+  savePosition();
+}
+
+let scrollSaveTimer;
+els.reader.addEventListener("scroll", () => {
+  if (!scrollMode || state.current < 0) return;
+  const r = els.reader;
+  const nearEnd = verticalMode
+    ? r.scrollWidth - Math.abs(r.scrollLeft) - r.clientWidth < 600
+    : r.scrollHeight - r.scrollTop - r.clientHeight < 600;
+  if (nearEnd) appendNextChapter().then(() => {});
+  clearTimeout(scrollSaveTimer);
+  scrollSaveTimer = setTimeout(updateVisibleChapter, 200);
+});
+
+async function showChapterScroll(index) {
+  state.current = index;
+  clearPaginationStyles();
+  els.flow.innerHTML = "";
+  scrollLoadedTo = index - 1;
+  await appendNextChapter();
+  await fillViewport();
+  els.reader.scrollTop = 0;
+  els.reader.scrollLeft = 0;
+  updateInfo();
+  setTocActive(index);
+  savePosition();
+}
+
+// ---------- показ главы ----------
+
 async function showChapter(index, { atEnd = false, atPage = 0 } = {}) {
   if (index < 0 || index >= state.chapters.length) return;
+  if (scrollMode) return showChapterScroll(index);
   state.current = index;
 
   els.flow.innerHTML = "<p>読み込み中…</p>";

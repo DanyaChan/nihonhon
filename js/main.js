@@ -72,6 +72,7 @@ $("btn-next").addEventListener("click", nextPage);
 
 applyWritingMode();
 $("btn-mode").addEventListener("click", toggleWritingMode);
+$("btn-view").addEventListener("click", toggleViewMode);
 
 let resizeTimer;
 window.addEventListener("resize", () => {
@@ -84,7 +85,7 @@ window.addEventListener("resize", () => {
 // В вертикальном режиме чтение идёт справа налево, поэтому стрелки меняются
 // местами: ← — вперёд, → — назад.
 document.addEventListener("keydown", (e) => {
-  if (state.current < 0) return;
+  if (state.current < 0 || scrollMode) return; // в скролле листает браузер
   const forwardKey = verticalMode ? "ArrowLeft" : "ArrowRight";
   const backKey = verticalMode ? "ArrowRight" : "ArrowLeft";
   if (e.key === backKey || e.key === "PageUp") { e.preventDefault(); prevPage(); }
@@ -96,6 +97,14 @@ document.addEventListener("keydown", (e) => {
 let wheelLock = false;
 els.reader.addEventListener("wheel", (e) => {
   if (state.current < 0) return;
+  if (scrollMode) {
+    // Вертикальное письмо скроллится горизонтально: колесо → сдвиг влево
+    if (verticalMode && e.deltaY) {
+      e.preventDefault();
+      els.reader.scrollBy({ left: -e.deltaY });
+    }
+    return; // горизонтальное письмо — обычный браузерный скролл
+  }
   e.preventDefault();
   if (wheelLock) return;
   wheelLock = true;

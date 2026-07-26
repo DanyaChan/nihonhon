@@ -201,6 +201,43 @@ button:hover {
   writing-mode: vertical-rl;
 }
 
+/* ---------- режим бесконечного скролла ---------- */
+
+/* Горизонтальное письмо: обычный вертикальный скролл */
+#reader.scroll-h {
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#reader.scroll-h #content {
+  height: auto;
+  overflow: visible;
+  margin: 0 auto;
+}
+
+/* Вертикальное письмо: скролл-контейнер сам в vertical-rl,
+   контент растёт влево, прокрутка горизонтальная */
+#reader.scroll-v {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  writing-mode: vertical-rl;
+}
+
+#reader.scroll-v #content {
+  width: auto;
+  max-width: none;
+  height: auto;
+  overflow: visible;
+}
+
+/* Отступ между подгруженными главами (block-start:
+   сверху при горизонтальном письме, справа при вертикальном) */
+.chapter-block + .chapter-block {
+  margin-block-start: 3em;
+}
+
 #flow ruby rt {
   font-size: 0.5em;
   color: var(--muted);

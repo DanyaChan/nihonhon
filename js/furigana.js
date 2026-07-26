@@ -8,8 +8,9 @@
  * слово разворачивается обратно в текст.
  * ============================================================ */
 
-// Путь относительно страницы (index.html), а не текущего скрипта
-const KUROMOJI_DICT = new URL("./lib/dict/", document.baseURI).href;
+// Только относительный путь: kuromoji прогоняет его через path.join,
+// который калечит абсолютные URL ("https://" -> "https:/")
+const KUROMOJI_DICT = "lib/dict/";
 
 let furiganaTokenizer = null;
 let furiganaLoading = false;
