@@ -192,6 +192,7 @@ async function buildPageMap(width, height) {
     meas.remove();
   }
   pageMap = counts;
+  invalidateScrollBreaks();
   updateInfo();
 }
 
@@ -224,23 +225,138 @@ function prevPage() {
   else if (state.current > 0) showChapter(state.current - 1, { atEnd: true });
 }
 
+// Размер «страницы», как если бы книга была в страничном режиме, —
+// для подсчёта карты страниц из режима скролла
+function pagedViewportSize() {
+  const cs = getComputedStyle(els.content);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const maxW = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue("--content-width")) || 760;
+  return {
+    width: Math.min(maxW, els.reader.clientWidth) - padX,
+    height: els.reader.clientHeight - padY,
+  };
+}
+
 // Пересчёт страниц при изменении размеров/шрифта (позицию держим примерно)
 function repaginate() {
-  if (scrollMode) return; // в режиме скролла браузер сам переверстает
+  if (scrollMode) {
+    // Браузер сам переверстает текст, но карту страниц надо обновить
+    invalidateScrollBreaks();
+    const v = pagedViewportSize();
+    schedulePageMap(v.width, v.height);
+    return;
+  }
   const ratio = page.total > 1 ? page.current / (page.total - 1) : 0;
   paginate();
   goToPage(Math.round(ratio * (page.total - 1)));
 }
 
+// ---------- счётчик страниц в режиме скролла ----------
+// Позиции строк, где начинается новая страница, предпосчитываются
+// на BREAKS_AHEAD страниц вперёд; при прокрутке остаётся только
+// найти последний разрыв перед концом видимой области.
+
+const BREAKS_AHEAD = 20;
+let scrollBreaks = null; // { list: [{off, page}], limit } в координатах потока
+
+function invalidateScrollBreaks() {
+  scrollBreaks = null;
+}
+
+function computeScrollBreaks() {
+  scrollBreaks = null;
+  if (!pageMap || pageMap.length !== state.chapters.length) return;
+  const v = pagedViewportSize();
+  const pageExtent = verticalMode ? v.width : v.height;
+  if (pageExtent <= 0) return;
+  const lineH = parseFloat(getComputedStyle(els.flow).lineHeight)
+    || parseFloat(getComputedStyle(els.flow).fontSize) * 1.9;
+
+  const flowR = els.flow.getBoundingClientRect();
+  const rr = els.reader.getBoundingClientRect();
+  // Координата вдоль оси чтения от начала потока
+  const toOff = (r) => verticalMode ? flowR.right - r.right : r.top - flowR.top;
+  const viewEnd = verticalMode ? flowR.right - rr.left : rr.bottom - flowR.top;
+  const limit = viewEnd + pageExtent * BREAKS_AHEAD;
+
+  const list = [];
+  for (const wrap of els.flow.children) {
+    const idx = Number(wrap.dataset.index);
+    const wr = wrap.getBoundingClientRect();
+    const start = toOff(wr);
+    const wrapExtent = verticalMode ? wr.width : wr.height;
+    let before = 0;
+    for (let i = 0; i < idx; i++) before += pageMap[i];
+    list.push({ off: start, page: before + 1 }); // глава = новая страница
+    if (start > limit) break;
+
+    // Сетка строк главы: прямоугольники блоков + шаг line-height
+    const blocks = [];
+    for (const el of wrap.querySelectorAll(ANCHOR_SELECTOR)) {
+      const r = el.getBoundingClientRect();
+      blocks.push({
+        start: toOff(r),
+        end: toOff(r) + (verticalMode ? r.width : r.height),
+      });
+    }
+
+    let target = start + pageExtent;
+    let pageInCh = 1;
+    let bi = 0;
+    while (pageInCh < pageMap[idx] && target < start + wrapExtent
+           && target <= limit + pageExtent) {
+      while (bi < blocks.length && blocks[bi].end <= target) bi++;
+      let snapped = target;
+      if (bi < blocks.length) {
+        const b = blocks[bi];
+        snapped = b.start >= target
+          ? b.start // разрыв попал в зазор между блоками
+          : b.start + Math.floor((target - b.start) / lineH) * lineH;
+      }
+      if (snapped <= list[list.length - 1].off) snapped = target; // защита
+      pageInCh++;
+      list.push({ off: snapped, page: before + pageInCh });
+      target = snapped + pageExtent;
+    }
+  }
+  scrollBreaks = { list, limit };
+}
+
+function scrollPageNumber() {
+  const flowR = els.flow.getBoundingClientRect();
+  const rr = els.reader.getBoundingClientRect();
+  const viewEnd = verticalMode ? flowR.right - rr.left : rr.bottom - flowR.top;
+
+  if (!scrollBreaks || viewEnd > scrollBreaks.limit) computeScrollBreaks();
+  if (!scrollBreaks || !scrollBreaks.list.length) return null;
+
+  const list = scrollBreaks.list;
+  let page = list[0].page;
+  for (const entry of list) {
+    if (entry.off < viewEnd) page = entry.page;
+    else break;
+  }
+  return page;
+}
+
 function updateInfo() {
   // Сквозная нумерация страниц по всей книге, когда она уже посчитана
-  if (!scrollMode && pageMap && pageMap.length === state.chapters.length) {
-    let before = 0;
-    for (let i = 0; i < state.current; i++) before += pageMap[i];
+  if (pageMap && pageMap.length === state.chapters.length) {
     const total = pageMap.reduce((a, b) => a + b, 0);
-    els.chapterInfo.textContent =
-      Math.min(before + page.current + 1, total) + " / " + total + "頁";
-    return;
+    let current;
+    if (scrollMode) {
+      current = scrollPageNumber();
+    } else {
+      let before = 0;
+      for (let i = 0; i < state.current; i++) before += pageMap[i];
+      current = before + page.current + 1;
+    }
+    if (current != null) {
+      els.chapterInfo.textContent = Math.min(current, total) + " / " + total + "頁";
+      return;
+    }
   }
   let text = (state.current + 1) + " / " + state.chapters.length;
   if (!scrollMode && page.total > 1) {
@@ -324,6 +440,7 @@ async function appendNextChapter() {
     wrap.appendChild(node);
     els.flow.appendChild(wrap);
     scrollLoadedTo = next;
+    invalidateScrollBreaks(); // разметка потока изменилась
   } finally {
     appendingChapter = false;
   }
@@ -399,6 +516,7 @@ function updateVisibleChapter() {
       break;
     }
   }
+  updateInfo(); // счётчик страниц следует за прокруткой
   savePosition(anchor);
 }
 
@@ -424,6 +542,9 @@ async function showChapterScroll(index, anchor) {
   els.reader.scrollTop = 0;
   els.reader.scrollLeft = 0;
   if (anchor) scrollToAnchor(anchor);
+  invalidateScrollBreaks();
+  const v = pagedViewportSize();
+  schedulePageMap(v.width, v.height);
   updateInfo();
   setTocActive(index);
   savePosition(anchor);
