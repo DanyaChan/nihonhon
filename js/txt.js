@@ -29,11 +29,20 @@ async function openTxt(file) {
   if (current.length) parts.push(current);
 
   const chapters = parts.map((partLines, i) => ({
-    title: parts.length === 1 ? title : "ページ " + (i + 1),
+    title: parts.length === 1 ? title : chunkTitle(partLines, i),
     render: async () => renderTxtPart(partLines),
   }));
 
   loadBook({ id: "txt:" + file.name + ":" + file.size, title, chapters });
+}
+
+// Заголовок куска — его первая непустая строка (без Aozora-разметки фуриганы)
+function chunkTitle(lines, i) {
+  for (const line of lines) {
+    const clean = line.replace(/《[^《》]*》/g, "").replace(/[|｜]/g, "").trim();
+    if (clean) return clipTitle(clean);
+  }
+  return "ページ " + (i + 1);
 }
 
 function decodeJapaneseText(buffer) {

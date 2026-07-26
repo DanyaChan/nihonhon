@@ -4,55 +4,22 @@
  * Точка входа: открытие файлов и обработчики событий.
  * ============================================================ */
 
-// ---------- хранение последнего файла (IndexedDB) ----------
-
-function idbFiles(mode, action) {
-  return new Promise((resolve, reject) => {
-    const open = indexedDB.open("nihonhon", 1);
-    open.onupgradeneeded = () => open.result.createObjectStore("files");
-    open.onerror = () => reject(open.error);
-    open.onsuccess = () => {
-      const db = open.result;
-      const req = action(db.transaction("files", mode).objectStore("files"));
-      req.onsuccess = () => { db.close(); resolve(req.result); };
-      req.onerror = () => { db.close(); reject(req.error); };
-    };
-  });
-}
-
-async function saveLastFile(file) {
-  try {
-    await idbFiles("readwrite", (store) => store.put(file, "last"));
-  } catch (e) {
-    console.warn("Не удалось сохранить книгу для автозагрузки:", e);
-  }
-}
-
-async function reopenLastFile() {
-  try {
-    const file = await idbFiles("readonly", (store) => store.get("last"));
-    if (file instanceof Blob) await openFile(file, { remember: false });
-  } catch (e) {
-    console.warn("Не удалось открыть последнюю книгу:", e);
-  }
-}
-
 // ---------- открытие файлов ----------
 
-async function openFile(file, { remember = true } = {}) {
+async function openFile(file) {
   if (!file) return;
   try {
     if (/\.epub$/i.test(file.name)) await openEpub(file);
     else if (/\.txt$/i.test(file.name)) await openTxt(file);
     else { alert("Поддерживаются только .epub и .txt"); return; }
-    if (remember) saveLastFile(file);
+    recordRecent(file); // библиотека: недавние + файл в IndexedDB
   } catch (e) {
     console.error(e);
     alert("Не удалось открыть книгу: " + e.message);
   }
 }
 
-reopenLastFile();
+reopenLastBook();
 
 $("btn-open").addEventListener("click", () => els.fileInput.click());
 $("btn-open-welcome").addEventListener("click", () => els.fileInput.click());

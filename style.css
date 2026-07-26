@@ -120,6 +120,80 @@ button:hover {
   text-align: right;
 }
 
+/* ---------- меню недавних книг ---------- */
+
+#recent-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 10px;
+  z-index: 60;
+  min-width: 260px;
+  max-width: 380px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 14px;
+}
+
+#recent-menu h3 {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+#recent-list {
+  list-style: none;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+#recent-list li,
+#bm-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+}
+
+#recent-list li.empty {
+  color: var(--muted);
+}
+
+.item-text {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-text:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
+.item-del {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.item-del:hover {
+  color: var(--accent);
+}
+
+#bm-list {
+  list-style: none;
+  font-size: 14px;
+}
+
 /* ---------- layout ---------- */
 
 #layout {
@@ -137,10 +211,24 @@ button:hover {
   padding: 14px;
 }
 
-#toc h2 {
+#toc details {
+  margin-bottom: 12px;
+}
+
+#toc summary {
   font-size: 16px;
-  margin-bottom: 10px;
+  font-weight: 600;
   color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  user-select: none;
+  margin-bottom: 6px;
+}
+
+#toc summary:hover {
+  background: var(--bg);
+  color: var(--accent);
 }
 
 #toc-list {

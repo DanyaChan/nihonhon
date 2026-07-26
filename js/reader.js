@@ -30,6 +30,40 @@ const els = {
   chapterInfo: $("chapter-info"),
 };
 
+// Обрезка текста для заголовка главы в оглавлении
+function clipTitle(s, max = 30) {
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+// Текст элемента без фуриганы
+function textWithoutRt(el) {
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll("rt, rp").forEach((n) => n.remove());
+  return clone.textContent.trim();
+}
+
+// Текущая позиция чтения — для закладок
+function getCurrentPosition() {
+  const chTitle = state.chapters[state.current]?.title || "";
+  const pos = { chapter: state.current, page: page.current, anchor: null, snippet: "" };
+  if (scrollMode) {
+    const wrap = els.flow.querySelector(
+      '.chapter-block[data-index="' + state.current + '"]');
+    if (wrap) {
+      pos.anchor = computeAnchor(wrap);
+      const el = wrap.querySelectorAll(ANCHOR_SELECTOR)[pos.anchor];
+      if (el) pos.snippet = clipTitle(textWithoutRt(el));
+    }
+  }
+  if (!pos.snippet) {
+    pos.snippet = clipTitle(chTitle);
+    if (!scrollMode && page.total > 1) {
+      pos.snippet += " ・ " + (page.current + 1) + "頁";
+    }
+  }
+  return pos;
+}
+
 // ---------- пагинация ----------
 // Глава раскладывается CSS-колонками шириной с окно чтения;
 // листание — сдвиг #flow по горизонтали на ширину страницы.
@@ -152,10 +186,12 @@ function updateInfo() {
   els.chapterInfo.textContent = text;
 }
 
-function savePosition() {
+function savePosition(anchor) {
   try {
-    localStorage.setItem("nihonhon:" + state.bookId,
-      JSON.stringify({ chapter: state.current, page: page.current }));
+    const pos = { chapter: state.current, page: page.current };
+    // В режиме скролла запоминаем абзац у начала видимой области
+    if (scrollMode && anchor != null) pos.anchor = anchor;
+    localStorage.setItem("nihonhon:" + state.bookId, JSON.stringify(pos));
   } catch { /* localStorage недоступен */ }
 }
 
@@ -192,15 +228,18 @@ function loadBook({ id, title, chapters }) {
   // Восстанавливаем позицию
   let start = 0;
   let startPage = 0;
+  let startAnchor = null;
   try {
     const saved = JSON.parse(localStorage.getItem("nihonhon:" + id));
     if (saved && saved.chapter < chapters.length) {
       start = saved.chapter;
       startPage = saved.page || 0;
+      startAnchor = saved.anchor ?? null;
     }
   } catch { /* нет сохранения */ }
 
-  showChapter(start, { atPage: startPage });
+  showChapter(start, { atPage: startPage, anchor: startAnchor });
+  renderBookmarks(); // список закладок этой книги (library.js)
 }
 
 // ---------- бесконечный скролл ----------
@@ -244,11 +283,43 @@ function setTocActive(index) {
     li.classList.toggle("active", i === index));
 }
 
+// Элементы, которые могут служить якорем позиции чтения
+const ANCHOR_SELECTOR = "p, h1, h2, h3, h4, h5, blockquote, li, img, table";
+
+// Первый блок главы, ещё не ушедший за начало видимой области
+function computeAnchor(wrap) {
+  const rr = els.reader.getBoundingClientRect();
+  const items = wrap.querySelectorAll(ANCHOR_SELECTOR);
+  for (let i = 0; i < items.length; i++) {
+    const r = items[i].getBoundingClientRect();
+    // Прочитанные блоки уходят вверх (или вправо при вертикальном письме)
+    const past = verticalMode ? r.left >= rr.right - 2 : r.bottom <= rr.top + 2;
+    if (!past) return i;
+  }
+  return 0;
+}
+
+// Прокрутка к сохранённому якорю (вызывается при сброшенном скролле)
+function scrollToAnchor(anchor) {
+  const wrap = els.flow.querySelector(
+    '.chapter-block[data-index="' + state.current + '"]');
+  const el = wrap && wrap.querySelectorAll(ANCHOR_SELECTOR)[anchor];
+  if (!el) return;
+  const rr = els.reader.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (verticalMode) {
+    els.reader.scrollBy({ left: r.right - rr.right });
+  } else {
+    els.reader.scrollBy({ top: r.top - rr.top });
+  }
+}
+
 // Определяем главу у начала видимой области (для инфо, TOC и сохранения)
 function updateVisibleChapter() {
   const rr = els.reader.getBoundingClientRect();
   const x = verticalMode ? rr.right - 10 : rr.left + rr.width / 2;
   const y = verticalMode ? rr.top + rr.height / 2 : rr.top + 10;
+  let anchor = null;
   for (const wrap of els.flow.children) {
     const r = wrap.getBoundingClientRect();
     const hit = verticalMode
@@ -261,10 +332,11 @@ function updateVisibleChapter() {
         updateInfo();
         setTocActive(index);
       }
+      anchor = computeAnchor(wrap);
       break;
     }
   }
-  savePosition();
+  savePosition(anchor);
 }
 
 let scrollSaveTimer;
@@ -279,7 +351,7 @@ els.reader.addEventListener("scroll", () => {
   scrollSaveTimer = setTimeout(updateVisibleChapter, 200);
 });
 
-async function showChapterScroll(index) {
+async function showChapterScroll(index, anchor) {
   state.current = index;
   clearPaginationStyles();
   els.flow.innerHTML = "";
@@ -288,16 +360,17 @@ async function showChapterScroll(index) {
   await fillViewport();
   els.reader.scrollTop = 0;
   els.reader.scrollLeft = 0;
+  if (anchor) scrollToAnchor(anchor);
   updateInfo();
   setTocActive(index);
-  savePosition();
+  savePosition(anchor);
 }
 
 // ---------- показ главы ----------
 
-async function showChapter(index, { atEnd = false, atPage = 0 } = {}) {
+async function showChapter(index, { atEnd = false, atPage = 0, anchor = null } = {}) {
   if (index < 0 || index >= state.chapters.length) return;
-  if (scrollMode) return showChapterScroll(index);
+  if (scrollMode) return showChapterScroll(index, anchor);
   state.current = index;
 
   els.flow.innerHTML = "<p>読み込み中…</p>";
