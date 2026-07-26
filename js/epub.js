@@ -133,8 +133,16 @@ async function renderEpubChapter(zip, path, pathToIndex) {
   const fragment = document.createElement("div");
   fragment.append(...document.importNode(body, true).childNodes);
 
-  // Убираем скрипты и стили книги — используем свои
-  fragment.querySelectorAll("script, style, link").forEach((n) => n.remove());
+  // Зачистка: книга — недоверенный файл, её скрипты выполняться не должны.
+  // Удаляем активные теги и все inline-обработчики (onclick, onload, ...)
+  fragment.querySelectorAll(
+    "script, style, link, iframe, object, embed, form, base, meta")
+    .forEach((n) => n.remove());
+  for (const el of fragment.querySelectorAll("*")) {
+    for (const attr of [...el.attributes]) {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+    }
+  }
 
   // Картинки: <img src> и svg <image xlink:href> -> blob URL из архива
   const imgTasks = [];
@@ -167,8 +175,13 @@ async function renderEpubChapter(zip, path, pathToIndex) {
   // Внутренние ссылки -> переход на нужную главу
   for (const a of fragment.querySelectorAll("a[href]")) {
     const href = a.getAttribute("href");
-    if (/^[a-z]+:/i.test(href)) {
+    if (/^https?:/i.test(href)) {
       a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+      continue;
+    }
+    if (/^[a-z]+:/i.test(href)) { // javascript:, data:, file: и т.п.
+      a.removeAttribute("href");
       continue;
     }
     const target = pathToIndex.get(resolvePath(path, href.split("#")[0]));

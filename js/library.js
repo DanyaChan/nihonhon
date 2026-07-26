@@ -49,7 +49,7 @@ async function recordRecent(file) {
   list.unshift({ id, name: file.name, time: Date.now() });
   // Старые книги за пределами лимита выселяем вместе с файлами
   for (const evicted of list.splice(RECENT_MAX)) {
-    idbFiles("readwrite", (s) => s.delete(evicted.id)).catch(() => {});
+    forgetBookData(evicted.id);
   }
   setRecents(list);
   try { localStorage.setItem("nihonhon:lastBook", id); } catch {}
@@ -69,9 +69,18 @@ async function openRecentBook(id, { quiet = false } = {}) {
   }
 }
 
+// Удаляет всё, что связано с книгой: файл, позицию, закладки
+function forgetBookData(id) {
+  idbFiles("readwrite", (s) => s.delete(id)).catch(() => {});
+  try {
+    localStorage.removeItem("nihonhon:" + id);
+    localStorage.removeItem("nihonhon:bm:" + id);
+  } catch {}
+}
+
 function removeRecent(id) {
   setRecents(getRecents().filter((r) => r.id !== id));
-  idbFiles("readwrite", (s) => s.delete(id)).catch(() => {});
+  forgetBookData(id);
   renderRecentMenu();
 }
 
@@ -111,6 +120,8 @@ function renderRecentMenu() {
 
 /** Автозагрузка последней книги при старте. */
 function reopenLastBook() {
+  // Уборка: запись "last" из старой версии больше не используется
+  idbFiles("readwrite", (s) => s.delete("last")).catch(() => {});
   let id = null;
   try { id = localStorage.getItem("nihonhon:lastBook"); } catch {}
   if (id) openRecentBook(id, { quiet: true });

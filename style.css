@@ -27,8 +27,10 @@ body {
   flex-direction: column;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
-               "Noto Sans JP", "Meiryo", sans-serif;
+  /* Интерфейс — системным шрифтом: японские шрифты рисуют кириллицу
+     широкими глифами "в японском стиле" */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
 }
 
 .hidden {
@@ -73,6 +75,41 @@ button {
 button:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Собственные тултипы кнопок тулбара: нативные title-подсказки
+   медленные и не работают во встроенных webview */
+#toolbar button[data-tip] {
+  position: relative;
+}
+
+#toolbar button[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  padding: 4px 9px;
+  background: var(--fg);
+  color: var(--bg);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* У крайних кнопок тултип прижимаем к краю, чтобы не вылезал за окно */
+#toolbar button#btn-open:hover::after,
+#toolbar button#btn-settings:hover::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+#toolbar button#btn-toc:hover::after {
+  left: 0;
+  transform: none;
 }
 
 /* ---------- панель настроек ---------- */
@@ -197,6 +234,7 @@ button:hover {
 /* ---------- layout ---------- */
 
 #layout {
+  position: relative; /* якорь для выезжающей панели #toc на мобильных */
   display: flex;
   flex: 1;
   min-height: 0;
@@ -308,6 +346,8 @@ button:hover {
 
 /* Поток текста, разбитый на страницы-колонки; листание — сдвигом transform */
 .flow {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+               "Noto Sans JP", "Meiryo", sans-serif;
   -webkit-user-select: text;
   user-select: text;
   height: 100%;
@@ -459,10 +499,22 @@ button:hover {
 /* ---------- mobile ---------- */
 
 @media (max-width: 640px) {
+  /* Кнопки не помещаются в одну строку — переносим */
+  #toolbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  #toolbar button {
+    padding: 5px 9px;
+    font-size: 14px;
+  }
+
+  /* Панель привязана к #layout, поэтому корректна при любой высоте тулбара */
   #toc {
     position: absolute;
     z-index: 10;
-    top: 49px;
+    top: 0;
     bottom: 0;
     left: 0;
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);

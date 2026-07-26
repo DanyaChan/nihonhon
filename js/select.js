@@ -6,7 +6,10 @@
  * Использует токенизатор и утилиты из furigana.js.
  * ============================================================ */
 
-const TRANSLATE_MAX = 1000; // предел длины текста для перевода
+// Предел длины текста для перевода: текст уходит GET-запросом, и после
+// encodeURIComponent японский раздувается ~в 9 раз — длиннее упрётся
+// в лимиты URL у прокси/серверов (414)
+const TRANSLATE_MAX = 450;
 
 // Обёртки <ruby>, добавленные для текущего выделения
 const selRubies = [];
@@ -40,7 +43,6 @@ async function showTranslation(text, rect) {
   transPop.textContent = "翻訳中…";
   showTransPop(rect);
 
-  console.log("Запрос перевода:", text);
   let result;
   try {
     result = await translateToEnglish(text.slice(0, TRANSLATE_MAX));
@@ -224,8 +226,13 @@ document.addEventListener("pointercancel", () => {
   selPointerDown = false;
 });
 
-// Перелистывание — убираем разметку выделения и поп-ап
-document.addEventListener("keydown", () => {
+// Перелистывание страниц — убираем разметку выделения и поп-ап.
+// Только клавиши листания: любые другие (в т.ч. Cmd/Ctrl+C) не должны
+// трогать DOM, иначе выделение уничтожится до самого копирования.
+const CLEAR_KEYS = ["ArrowLeft", "ArrowRight", "PageUp", "PageDown", " ", "Escape"];
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!CLEAR_KEYS.includes(e.key)) return;
   if (selRubies.length || !transPop.classList.contains("hidden")) {
     clearSelectionAnnotations();
   }

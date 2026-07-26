@@ -53,6 +53,13 @@ window.addEventListener("resize", () => {
 // местами: ← — вперёд, → — назад.
 document.addEventListener("keydown", (e) => {
   if (state.current < 0 || scrollMode) return; // в скролле листает браузер
+  // Комбинации с модификаторами (Cmd+← и т.п.) — браузеру
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  // Фокус в элементах управления (ползунок, пикеры, кнопки) — им
+  if (e.target instanceof Element &&
+      e.target.closest("input, textarea, select, button, [contenteditable]")) {
+    return;
+  }
   const forwardKey = verticalMode ? "ArrowLeft" : "ArrowRight";
   const backKey = verticalMode ? "ArrowRight" : "ArrowLeft";
   if (e.key === backKey || e.key === "PageUp") { e.preventDefault(); prevPage(); }
@@ -82,7 +89,8 @@ els.reader.addEventListener("wheel", (e) => {
 
 // ---------- размер шрифта ----------
 
-let fontSize = parseInt(localStorage.getItem("nihonhon:fontSize")) || 20;
+let fontSize = 20;
+try { fontSize = parseInt(localStorage.getItem("nihonhon:fontSize")) || 20; } catch {}
 applyFontSize();
 
 function applyFontSize() {

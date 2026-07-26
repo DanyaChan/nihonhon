@@ -160,6 +160,21 @@ function schedulePageMap(width, height) {
   buildPageMap(width, height);
 }
 
+// Освобождает blob-URL картинок внутри узла (после фонового замера
+// главы её blob-URL больше никому не нужны — иначе они копятся до
+// открытия другой книги)
+function revokeBlobUrlsIn(root) {
+  if (!root.querySelectorAll) return;
+  for (const el of root.querySelectorAll("img, image")) {
+    const url = el.getAttribute("src") || el.getAttribute("href") ||
+      el.getAttribute("xlink:href") || "";
+    if (!url.startsWith("blob:")) continue;
+    URL.revokeObjectURL(url);
+    const i = state.blobUrls.indexOf(url);
+    if (i >= 0) state.blobUrls.splice(i, 1);
+  }
+}
+
 async function buildPageMap(width, height) {
   const token = ++pageMapToken;
   pageMap = null;
@@ -177,16 +192,20 @@ async function buildPageMap(width, height) {
   try {
     for (const chapter of state.chapters) {
       const node = await chapter.render();
-      if (token !== pageMapToken) return; // вёрстка успела измениться
-      meas.innerHTML = "";
-      meas.appendChild(node);
-      await Promise.all([...meas.querySelectorAll("img")].map((img) =>
-        img.complete ? null : new Promise((res) => {
-          img.onload = img.onerror = res;
-        })));
-      if (token !== pageMapToken) return;
-      const size = verticalMode ? meas.scrollHeight : meas.scrollWidth;
-      counts.push(Math.max(1, Math.round((size + PAGE_GAP) / step)));
+      try {
+        if (token !== pageMapToken) return; // вёрстка успела измениться
+        meas.innerHTML = "";
+        meas.appendChild(node);
+        await Promise.all([...meas.querySelectorAll("img")].map((img) =>
+          img.complete ? null : new Promise((res) => {
+            img.onload = img.onerror = res;
+          })));
+        if (token !== pageMapToken) return;
+        const size = verticalMode ? meas.scrollHeight : meas.scrollWidth;
+        counts.push(Math.max(1, Math.round((size + PAGE_GAP) / step)));
+      } finally {
+        revokeBlobUrlsIn(node);
+      }
     }
   } finally {
     meas.remove();
@@ -410,7 +429,8 @@ function loadBook({ id, title, chapters }) {
   let startAnchor = null;
   try {
     const saved = JSON.parse(localStorage.getItem("nihonhon:" + id));
-    if (saved && saved.chapter < chapters.length) {
+    if (saved && Number.isInteger(saved.chapter) &&
+        saved.chapter >= 0 && saved.chapter < chapters.length) {
       start = saved.chapter;
       startPage = saved.page || 0;
       startAnchor = saved.anchor ?? null;
@@ -509,7 +529,6 @@ function updateVisibleChapter() {
       const index = Number(wrap.dataset.index);
       if (index !== state.current) {
         state.current = index;
-        updateInfo();
         setTocActive(index);
       }
       anchor = computeAnchor(wrap);
