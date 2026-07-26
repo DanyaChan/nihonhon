@@ -141,7 +141,12 @@ async function renderEpubChapter(zip, path, pathToIndex) {
   const inlineImage = (el, attr, value) => {
     imgTasks.push((async () => {
       const imgPath = resolvePath(path, value);
-      if (!zip.has(imgPath)) return;
+      if (!zip.has(imgPath)) {
+        // Оставленный относительный путь браузер попытался бы грузить
+        // с диска (file:) — Safari на это ругается в консоль
+        el.remove();
+        return;
+      }
       const ext = imgPath.split(".").pop().toLowerCase();
       const blob = new Blob([await zip.extract(imgPath)],
         { type: MIME_BY_EXT[ext] || "application/octet-stream" });

@@ -115,6 +115,9 @@ function caretFromPoint(x, y) {
 }
 
 function furiganaAt(e) {
+  // Идёт выделение текста — не трогаем DOM, иначе выделение сломается
+  if (e.buttons || !window.getSelection().isCollapsed) return;
+
   // Курсор всё ещё над текущим словом — ничего не делаем
   if (hoverRuby && e.target instanceof Element && hoverRuby.contains(e.target)) {
     return;

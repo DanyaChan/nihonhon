@@ -168,6 +168,8 @@ button:hover {
 
 /* Поток текста, разбитый на страницы-колонки; листание — сдвигом transform */
 #flow {
+  -webkit-user-select: text;
+  user-select: text;
   height: 100%;
   column-fill: auto;
   column-gap: 48px;
@@ -218,9 +220,24 @@ button:hover {
   white-space: nowrap;
 }
 
-/* Фуригана, показанная по наведению, — чуть выделена цветом */
+/* Фуригана, показанная по наведению/выделению, — чуть выделена цветом */
 #flow ruby.hover-ruby rt {
   color: var(--accent);
+}
+
+/* Поп-ап с переводом выделенного текста */
+#translate-pop {
+  position: fixed;
+  z-index: 101;
+  padding: 10px 14px;
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 15px;
+  line-height: 1.5;
+  user-select: text;
 }
 
 /* ---------- navbar ---------- */
