@@ -175,3 +175,10 @@ els.reader.addEventListener("mouseleave", () => {
   clearTimeout(furiganaTimer);
   removeHoverRuby();
 });
+
+// Перед началом выделения возвращаем DOM в исходное состояние,
+// чтобы протяжка не шла по разрезанным hover-обёрткой узлам
+els.reader.addEventListener("pointerdown", () => {
+  clearTimeout(furiganaTimer);
+  removeHoverRuby();
+});

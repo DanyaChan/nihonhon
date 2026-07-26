@@ -392,6 +392,13 @@ button:hover {
   color: var(--muted);
 }
 
+/* Фуригана не участвует в выделении: иначе протяжка мышью через
+   руби «спотыкается», а чтения попадают в скопированный текст */
+.flow rt, .flow rp {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .flow a {
   color: var(--accent);
 }
