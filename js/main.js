@@ -70,6 +70,9 @@ $("btn-toc").addEventListener("click", () => {
 $("btn-prev").addEventListener("click", prevPage);
 $("btn-next").addEventListener("click", nextPage);
 
+applyWritingMode();
+$("btn-mode").addEventListener("click", toggleWritingMode);
+
 let resizeTimer;
 window.addEventListener("resize", () => {
   if (state.current < 0) return;
@@ -77,11 +80,15 @@ window.addEventListener("resize", () => {
   resizeTimer = setTimeout(repaginate, 150);
 });
 
-// Стрелки ← → и колесо мыши — перелистывание страниц
+// Стрелки ← → и колесо мыши — перелистывание страниц.
+// В вертикальном режиме чтение идёт справа налево, поэтому стрелки меняются
+// местами: ← — вперёд, → — назад.
 document.addEventListener("keydown", (e) => {
   if (state.current < 0) return;
-  if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prevPage(); }
-  if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
+  const forwardKey = verticalMode ? "ArrowLeft" : "ArrowRight";
+  const backKey = verticalMode ? "ArrowRight" : "ArrowLeft";
+  if (e.key === backKey || e.key === "PageUp") { e.preventDefault(); prevPage(); }
+  if (e.key === forwardKey || e.key === "PageDown" || e.key === " ") {
     e.preventDefault(); nextPage();
   }
 });

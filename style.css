@@ -196,6 +196,11 @@ button:hover {
   margin: 0.5em auto;
 }
 
+/* Вертикальное письмо: сверху вниз, столбцы справа налево */
+#flow.vertical {
+  writing-mode: vertical-rl;
+}
+
 #flow ruby rt {
   font-size: 0.5em;
   color: var(--muted);

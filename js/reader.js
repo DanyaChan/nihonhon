@@ -37,19 +37,52 @@ const els = {
 const page = { current: 0, total: 1, step: 0 };
 const PAGE_GAP = 48; // должен совпадать с column-gap в CSS
 
+// Режим направления текста: false — горизонтально (слева направо),
+// true — вертикально 縦書き (сверху вниз, столбцы справа налево)
+let verticalMode = false;
+try { verticalMode = localStorage.getItem("nihonhon:vertical") === "1"; } catch {}
+
+function applyWritingMode() {
+  els.flow.classList.toggle("vertical", verticalMode);
+  // На кнопке — режим, В КОТОРЫЙ переключит нажатие
+  $("btn-mode").textContent = verticalMode ? "横書き" : "縦書き";
+}
+
+function toggleWritingMode() {
+  verticalMode = !verticalMode;
+  try { localStorage.setItem("nihonhon:vertical", verticalMode ? "1" : "0"); } catch {}
+  applyWritingMode();
+  if (state.current >= 0) repaginate();
+}
+
 function paginate() {
+  const cs = getComputedStyle(els.content);
   const width = els.content.clientWidth
-    - parseFloat(getComputedStyle(els.content).paddingLeft)
-    - parseFloat(getComputedStyle(els.content).paddingRight);
-  els.flow.style.columnWidth = width + "px";
+    - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const height = els.content.clientHeight
+    - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   els.flow.style.width = width + "px";
-  page.step = width + PAGE_GAP;
-  page.total = Math.max(1, Math.round((els.flow.scrollWidth + PAGE_GAP) / page.step));
+  els.flow.style.height = height + "px";
+
+  if (verticalMode) {
+    // В vertical-rl колонки укладываются по инлайн-оси — вертикально:
+    // каждая колонка высотой с окно становится страницей, листаем по Y
+    els.flow.style.columnWidth = height + "px";
+    page.step = height + PAGE_GAP;
+    page.total = Math.max(1, Math.round((els.flow.scrollHeight + PAGE_GAP) / page.step));
+  } else {
+    els.flow.style.columnWidth = width + "px";
+    page.step = width + PAGE_GAP;
+    page.total = Math.max(1, Math.round((els.flow.scrollWidth + PAGE_GAP) / page.step));
+  }
 }
 
 function goToPage(i) {
   page.current = Math.max(0, Math.min(page.total - 1, i));
-  els.flow.style.transform = "translateX(" + (-page.current * page.step) + "px)";
+  const shift = -page.current * page.step;
+  els.flow.style.transform = verticalMode
+    ? "translateY(" + shift + "px)"
+    : "translateX(" + shift + "px)";
   updateInfo();
   savePosition();
 }
