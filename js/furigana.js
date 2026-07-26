@@ -8,7 +8,7 @@
  * слово разворачивается обратно в текст.
  * ============================================================ */
 
-const KUROMOJI_DICT = "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/";
+const KUROMOJI_DICT = "lib/dict/";
 
 let furiganaTokenizer = null;
 let furiganaLoading = false;
