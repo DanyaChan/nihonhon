@@ -223,6 +223,7 @@ button:hover {
 }
 
 .lib-cover {
+  position: relative; /* якорь для полоски прогресса */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,10 +274,26 @@ button:hover {
   overflow: hidden;
 }
 
-.lib-date {
+.lib-progress {
   margin-top: 2px;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Доля прочитанного — полоска у нижнего края обложки */
+.lib-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.lib-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
 }
 
 .lib-del {

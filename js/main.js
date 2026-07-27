@@ -14,10 +14,27 @@ async function openFile(file) {
     else { alert("Поддерживаются только .epub и .txt"); return; }
     // библиотека: недавние + файл и обложка в IndexedDB (ждём, иначе
     // полка, открытая сразу после, не найдёт записи книги)
-    await recordRecent(file);
+    await recordRecent(file, { title: state.title, cover: state.cover });
   } catch (e) {
     console.error(e);
     alert("Не удалось открыть книгу: " + e.message);
+  }
+}
+
+/** Выбрали несколько файлов: первый открываем, остальные — просто в полку. */
+async function openFiles(fileList) {
+  const files = [...fileList].filter((f) => /\.(epub|txt)$/i.test(f.name));
+  if (!files.length) {
+    if (fileList.length) alert("Поддерживаются только .epub и .txt");
+    return;
+  }
+  await openFile(files[0]);
+  for (const file of files.slice(1)) {
+    try {
+      await importBook(file);
+    } catch (e) {
+      console.warn("Не удалось добавить книгу в полку:", file.name, e);
+    }
   }
 }
 
@@ -26,8 +43,9 @@ reopenLastBook();
 $("btn-open").addEventListener("click", () => els.fileInput.click());
 $("btn-open-welcome").addEventListener("click", () => els.fileInput.click());
 els.fileInput.addEventListener("change", () => {
-  openFile(els.fileInput.files[0]);
+  const files = [...els.fileInput.files];
   els.fileInput.value = "";
+  openFiles(files);
 });
 
 // ---------- навигация ----------
@@ -118,5 +136,5 @@ els.reader.addEventListener("dragleave", () => els.reader.classList.remove("drag
 els.reader.addEventListener("drop", (e) => {
   e.preventDefault();
   els.reader.classList.remove("dragover");
-  openFile(e.dataTransfer.files[0]);
+  openFiles(e.dataTransfer.files);
 });

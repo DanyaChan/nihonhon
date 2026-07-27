@@ -438,6 +438,13 @@ function savePosition(anchor) {
     const pos = { chapter: state.current, page: page.current };
     // В режиме скролла запоминаем абзац у начала видимой области
     if (scrollMode && anchor != null) pos.anchor = anchor;
+    // Прогресс — чтобы полка показывала его, не открывая книгу
+    pos.chapters = state.chapters.length;
+    const global = globalPagePosition();
+    if (global) {
+      pos.pageNo = global.current;
+      pos.pages = global.total;
+    }
     localStorage.setItem("nihonhon:" + state.bookId, JSON.stringify(pos));
     console.debug("[nihonhon] позиция сохранена:", JSON.stringify(pos));
   } catch { /* localStorage недоступен */ }

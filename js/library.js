@@ -5,7 +5,7 @@
  * localStorage) и закладки (localStorage, по id книги).
  * ============================================================ */
 
-const RECENT_MAX = 10;
+const RECENT_MAX = 100;
 
 function bookIdFor(file) {
   const kind = /\.epub$/i.test(file.name) ? "epub" : "txt";
@@ -37,26 +37,46 @@ function setRecents(list) {
   try { localStorage.setItem("nihonhon:recent", JSON.stringify(list)); } catch {}
 }
 
-/** Вызывается при каждом успешном открытии файла. */
-async function recordRecent(file) {
+/**
+ * Кладёт книгу в хранилище и в список недавних.
+ * open: false — книгу не открывали, просто добавили в полку.
+ */
+async function recordRecent(file, { title, cover = null, open = true } = {}) {
   const id = bookIdFor(file);
   try {
     await idbFiles("readwrite", (s) => s.put(file, id));
     // Обложку кладём рядом: полка не должна распаковывать книги при показе
-    await idbFiles("readwrite", (s) => s.put(state.cover || null, coverKey(id)));
+    await idbFiles("readwrite", (s) => s.put(cover, coverKey(id)));
   } catch (e) {
     console.warn("Не удалось сохранить книгу в хранилище:", e);
   }
+
   const list = getRecents().filter((r) => r.id !== id);
-  list.unshift({ id, name: file.name, title: state.title || file.name,
-                 time: Date.now() });
+  const entry = { id, name: file.name, title: title || file.name, time: Date.now() };
+  if (open) list.unshift(entry);
+  // Добавленные пачкой книги не вытесняют с первого места ту, что читаем
+  else list.splice(list[0]?.id === state.bookId ? 1 : 0, 0, entry);
+
   // Старые книги за пределами лимита выселяем вместе с файлами
   for (const evicted of list.splice(RECENT_MAX)) {
     forgetBookData(evicted.id);
   }
   setRecents(list);
-  try { localStorage.setItem("nihonhon:lastBook", id); } catch {}
+  if (open) {
+    try { localStorage.setItem("nihonhon:lastBook", id); } catch {}
+  }
   if (libraryOpen()) renderLibrary();
+}
+
+/** Добавляет книгу в полку, не открывая её. */
+async function importBook(file) {
+  if (/\.epub$/i.test(file.name)) {
+    const meta = await epubMetaFromFile(file);
+    await recordRecent(file, { ...meta, open: false });
+  } else {
+    await recordRecent(file,
+      { title: file.name.replace(/\.txt$/i, ""), open: false });
+  }
 }
 
 async function openRecentBook(id, { quiet = false } = {}) {
@@ -107,7 +127,7 @@ async function ensureCover(id) {
     let cover = null;
     if (id.startsWith("epub:")) {
       const file = await idbFiles("readonly", (s) => s.get(id));
-      if (file instanceof Blob) cover = await epubCoverFromFile(file);
+      if (file instanceof Blob) cover = (await epubMetaFromFile(file)).cover;
     }
     await idbFiles("readwrite", (s) => s.put(cover, coverKey(id)));
     return cover;
@@ -143,9 +163,42 @@ function releaseCoverUrls() {
   libCoverUrls = [];
 }
 
+/**
+ * Прогресс чтения из сохранённой позиции: {text, ratio} или null.
+ * Числа страниц — те, что были при последнем чтении (они зависят
+ * от размера шрифта и окна).
+ */
+function bookProgress(id) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("nihonhon:" + id)); } catch {}
+  if (!saved) return null;
+
+  if (saved.pages > 0 && saved.pageNo > 0) {
+    const ratio = Math.min(saved.pageNo / saved.pages, 1);
+    return {
+      text: saved.pageNo + " / " + saved.pages + " стр · " +
+        Math.round(ratio * 100) + "%",
+      ratio,
+    };
+  }
+  // Карта страниц не успела посчитаться — остаются главы
+  if (saved.chapters > 0) {
+    const ratio = Math.min((saved.chapter + 1) / saved.chapters, 1);
+    return {
+      text: "гл. " + (saved.chapter + 1) + " / " + saved.chapters + " · " +
+        Math.round(ratio * 100) + "%",
+      ratio,
+    };
+  }
+  return null;
+}
+
 function makeCard(r) {
+  const progress = bookProgress(r.id);
+
   const card = document.createElement("div");
   card.className = "lib-card" + (r.id === state.bookId ? " active" : "");
+  card.title = r.name + " — открыта " + new Date(r.time).toLocaleString();
   card.addEventListener("click", () => {
     closeLibrary();
     openRecentBook(r.id);
@@ -159,14 +212,23 @@ function makeCard(r) {
   stub.textContent = clipTitle(r.title || r.name, 60);
   cover.appendChild(stub);
 
+  // Полоска прочитанного поверх нижнего края обложки
+  if (progress) {
+    const bar = document.createElement("div");
+    bar.className = "lib-bar";
+    const fill = document.createElement("span");
+    fill.style.width = Math.round(progress.ratio * 100) + "%";
+    bar.appendChild(fill);
+    cover.appendChild(bar);
+  }
+
   const title = document.createElement("div");
   title.className = "lib-title";
   title.textContent = r.title || r.name;
-  title.title = r.name;
 
-  const date = document.createElement("div");
-  date.className = "lib-date";
-  date.textContent = new Date(r.time).toLocaleDateString();
+  const info = document.createElement("div");
+  info.className = "lib-progress";
+  info.textContent = progress ? progress.text : "не начата";
 
   const del = document.createElement("button");
   del.className = "lib-del";
@@ -177,8 +239,8 @@ function makeCard(r) {
     removeRecent(r.id);
   });
 
-  card.append(cover, title, date, del);
-  return { card, cover };
+  card.append(cover, title, info, del);
+  return { card, stub };
 }
 
 async function renderLibrary() {
@@ -195,10 +257,10 @@ async function renderLibrary() {
     return;
   }
 
-  const covers = new Map(); // id -> элемент обложки
+  const stubs = new Map(); // id -> заглушка, которую заменит картинка
   for (const r of list) {
-    const { card, cover } = makeCard(r);
-    covers.set(r.id, cover);
+    const { card, stub } = makeCard(r);
+    stubs.set(r.id, stub);
     libGrid.appendChild(card);
   }
 
@@ -212,7 +274,7 @@ async function renderLibrary() {
     const img = document.createElement("img");
     img.src = url;
     img.alt = "";
-    covers.get(r.id).replaceChildren(img);
+    stubs.get(r.id).replaceWith(img); // полоска прогресса остаётся на месте
   }
 }
 

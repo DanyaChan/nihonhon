@@ -24,6 +24,8 @@ function resolvePath(base, rel) {
   return out.join("/");
 }
 
+const DC_NS = "http://purl.org/dc/elements/1.1/";
+
 const MIME_BY_EXT = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
   gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
@@ -57,9 +59,8 @@ async function openEpub(file) {
   const zip = new ZipArchive(await file.arrayBuffer());
   const { opf, opfPath, manifest } = await readOpf(zip);
 
-  const title =
-    opf.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "title")[0]
-      ?.textContent?.trim() || file.name.replace(/\.epub$/i, "");
+  const title = opf.getElementsByTagNameNS(DC_NS, "title")[0]?.textContent?.trim()
+    || file.name.replace(/\.epub$/i, "");
 
   const spinePaths = [];
   for (const ref of opf.querySelectorAll("spine > itemref")) {
@@ -114,15 +115,20 @@ async function extractEpubCover(zip, opf, manifest) {
   }
 }
 
-/** Обложка книги, уже лежащей в хранилище (файл ещё не открыт). */
-async function epubCoverFromFile(file) {
+/** Название и обложка книги без её открытия (для полки). */
+async function epubMetaFromFile(file) {
+  const fallback = { title: file.name.replace(/\.epub$/i, ""), cover: null };
   try {
     const zip = new ZipArchive(await file.arrayBuffer());
     const { opf, manifest } = await readOpf(zip);
-    return await extractEpubCover(zip, opf, manifest);
+    return {
+      title: opf.getElementsByTagNameNS(DC_NS, "title")[0]?.textContent?.trim()
+        || fallback.title,
+      cover: await extractEpubCover(zip, opf, manifest),
+    };
   } catch (e) {
-    console.warn("Не удалось разобрать книгу ради обложки:", e);
-    return null;
+    console.warn("Не удалось прочитать метаданные книги:", e);
+    return fallback;
   }
 }
 
