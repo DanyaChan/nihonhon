@@ -116,6 +116,7 @@ applyFontSize();
 
 function applyFontSize() {
   document.documentElement.style.setProperty("--content-font-size", fontSize + "px");
+  $("set-font-val").textContent = fontSize + " px";
   try { localStorage.setItem("nihonhon:fontSize", fontSize); } catch {}
   if (state.current >= 0) repaginate();
 }

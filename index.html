@@ -19,10 +19,6 @@
     <button id="btn-toc" data-tip="Оглавление и закладки" aria-label="Оглавление и закладки">☰</button>
     <span id="book-title">日本本</span>
     <div class="spacer"></div>
-    <button id="btn-view" data-tip="Режим отображения" aria-label="Режим отображения">スクロール</button>
-    <button id="btn-mode" data-tip="Направление текста" aria-label="Направление текста">縦書き</button>
-    <button id="btn-font-minus" data-tip="Уменьшить шрифт" aria-label="Уменьшить шрифт">A−</button>
-    <button id="btn-font-plus" data-tip="Увеличить шрифт" aria-label="Увеличить шрифт">A＋</button>
     <button id="btn-bookmark" data-tip="Добавить закладку" aria-label="Добавить закладку">🔖</button>
     <button id="btn-recent" data-tip="Недавние книги" aria-label="Недавние книги">📚</button>
     <button id="btn-settings" data-tip="Настройки" aria-label="Настройки">⚙</button>
@@ -30,24 +26,63 @@
     <input type="file" id="file-input" accept=".epub,.txt" multiple hidden>
 
     <div id="settings" class="hidden">
-      <label>Цвет текста <input type="color" id="set-fg"></label>
-      <label>Цвет фона <input type="color" id="set-bg"></label>
-      <label>Ширина текста
-        <input type="range" id="set-width" min="400" max="2400" step="20">
-        <span id="set-width-val"></span>
-      </label>
-      <label>Сохранять позицию с задержкой
-        <input type="checkbox" id="set-delayed-save">
-      </label>
-      <label>Размывать картинки до клика
-        <input type="checkbox" id="set-blur-images">
-      </label>
-      <label>Скрывать верхнюю панель
-        <input type="checkbox" id="set-hide-top">
-      </label>
-      <label>Скрывать нижнюю панель
-        <input type="checkbox" id="set-hide-bottom">
-      </label>
+      <div class="set-tabs">
+        <button class="set-tab active" data-tab="reading">Чтение</button>
+        <button class="set-tab" data-tab="theme">Оформление</button>
+      </div>
+
+      <div class="set-pane" data-pane="reading">
+        <div class="set-row">Размер шрифта
+          <span class="set-group">
+            <button id="btn-font-minus" aria-label="Уменьшить шрифт">A−</button>
+            <span id="set-font-val"></span>
+            <button id="btn-font-plus" aria-label="Увеличить шрифт">A＋</button>
+          </span>
+        </div>
+        <label>Шрифт <select id="set-font"></select></label>
+        <div class="set-row">Направление текста
+          <button id="btn-mode" aria-label="Направление текста">縦書き</button>
+        </div>
+        <div class="set-row">Режим отображения
+          <button id="btn-view" aria-label="Режим отображения">スクロール</button>
+        </div>
+        <label>Межстрочный интервал
+          <input type="range" id="set-line-height" min="1.0" max="3" step="0.1">
+          <span id="set-line-height-val"></span>
+        </label>
+        <label>Ширина текста
+          <input type="range" id="set-width" min="400" max="2400" step="20">
+          <span id="set-width-val"></span>
+        </label>
+        <label>Сохранять позицию с задержкой
+          <input type="checkbox" id="set-delayed-save">
+        </label>
+        <label>Размывать картинки до клика
+          <input type="checkbox" id="set-blur-images">
+        </label>
+        <label>Скрывать верхнюю панель
+          <input type="checkbox" id="set-hide-top">
+        </label>
+        <label>Скрывать нижнюю панель
+          <input type="checkbox" id="set-hide-bottom">
+        </label>
+      </div>
+
+      <div class="set-pane hidden" data-pane="theme">
+        <label>Тема <select id="set-theme"></select></label>
+        <div id="theme-preview"><span>本 日本語のテキスト</span></div>
+        <div id="custom-colors" class="hidden">
+          <label>Текст книги <input type="color" id="col-reader-fg"></label>
+          <label>Фон книги <input type="color" id="col-reader-bg"></label>
+          <label>Текст интерфейса <input type="color" id="col-fg"></label>
+          <label>Фон интерфейса <input type="color" id="col-bg"></label>
+          <label>Панели <input type="color" id="col-panel"></label>
+          <label>Границы <input type="color" id="col-border"></label>
+          <label>Акцент <input type="color" id="col-accent"></label>
+          <label>Второстепенный текст <input type="color" id="col-muted"></label>
+        </div>
+      </div>
+
       <button id="set-reset">Сбросить</button>
     </div>
   </header>
