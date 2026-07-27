@@ -286,7 +286,8 @@ body.hide-bottom #navbar.peek {
 }
 
 #set-width-val,
-#set-line-height-val {
+#set-line-height-val,
+#set-indent-val {
   color: var(--muted);
   min-width: 52px;
   text-align: right;
@@ -636,7 +637,7 @@ body.hide-bottom #navbar.peek {
 
 .flow p {
   margin-bottom: 0.4em;
-  text-indent: 1em;
+  text-indent: var(--content-indent, 1em);
 }
 
 /* Картинка вписывается в область чтения: пределы в пикселях задаёт

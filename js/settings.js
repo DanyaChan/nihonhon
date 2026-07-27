@@ -123,6 +123,7 @@ const SETTINGS_DEFAULTS = {
   custom: null,    // цвета своей темы, создаются при первом выборе
   width: 760,      // px, --content-width
   lineHeight: 1.9, // --content-line-height
+  indent: 1,       // отступ первой строки абзаца, em
   delayedSave: true, // позиция в скролле пишется после 5 с неподвижности
   hideTop: false,    // верхняя панель выезжает по наведению на край
   hideBottom: false, // то же для нижней
@@ -157,6 +158,8 @@ const setWidthVal = $("set-width-val");
 const setFont = $("set-font");
 const setLineHeight = $("set-line-height");
 const setLineHeightVal = $("set-line-height-val");
+const setIndent = $("set-indent");
+const setIndentVal = $("set-indent-val");
 const setDelayedSave = $("set-delayed-save");
 const setHideTop = $("set-hide-top");
 const setHideBottom = $("set-hide-bottom");
@@ -217,6 +220,7 @@ function applySettings() {
 
   root.setProperty("--content-width", settings.width + "px");
   root.setProperty("--content-line-height", settings.lineHeight);
+  root.setProperty("--content-indent", settings.indent + "em");
 
   document.body.classList.toggle("hide-top", !!settings.hideTop);
   document.body.classList.toggle("hide-bottom", !!settings.hideBottom);
@@ -226,6 +230,8 @@ function applySettings() {
   setWidthVal.textContent = settings.width + " px";
   setLineHeight.value = settings.lineHeight;
   setLineHeightVal.textContent = Number(settings.lineHeight).toFixed(1);
+  setIndent.value = settings.indent;
+  setIndentVal.textContent = Number(settings.indent).toFixed(1) + " em";
   setDelayedSave.checked = settings.delayedSave !== false;
   setHideTop.checked = !!settings.hideTop;
   setHideBottom.checked = !!settings.hideBottom;
@@ -239,7 +245,8 @@ function saveSettings() {
 }
 
 // Настройки, меняющие размер области чтения
-const LAYOUT_KEYS = ["font", "width", "lineHeight", "hideTop", "hideBottom"];
+const LAYOUT_KEYS = ["font", "width", "lineHeight", "indent",
+                     "hideTop", "hideBottom"];
 
 function updateSetting(key, value) {
   settings[key] = value;
@@ -270,6 +277,8 @@ setWidth.addEventListener("input", () =>
 setFont.addEventListener("change", () => updateSetting("font", setFont.value));
 setLineHeight.addEventListener("input", () =>
   updateSetting("lineHeight", Number(setLineHeight.value)));
+setIndent.addEventListener("input", () =>
+  updateSetting("indent", Number(setIndent.value)));
 setDelayedSave.addEventListener("change", () =>
   updateSetting("delayedSave", setDelayedSave.checked));
 setHideTop.addEventListener("change", () =>
