@@ -61,7 +61,7 @@ function renderTxtPart(lines) {
     }
     fragment.appendChild(p);
   }
-  return fragment;
+  return markIdeographicSpaces(fragment);
 }
 
 /**

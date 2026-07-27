@@ -220,7 +220,13 @@ function applySettings() {
 
   root.setProperty("--content-width", settings.width + "px");
   root.setProperty("--content-line-height", settings.lineHeight);
-  root.setProperty("--content-indent", settings.indent + "em");
+  // Японский текст часто уже начинается с идеографического пробела U+3000
+  // шириной в знак. До 1em он лишний — прячем его; от 1em и выше он и есть
+  // первый em отступа, поэтому CSS добавляет только остаток
+  const indent = Number(settings.indent);
+  root.setProperty("--content-indent",
+    (indent >= 1 ? indent - 1 : indent) + "em");
+  document.body.classList.toggle("hide-u3000", indent < 1);
 
   document.body.classList.toggle("hide-top", !!settings.hideTop);
   document.body.classList.toggle("hide-bottom", !!settings.hideBottom);

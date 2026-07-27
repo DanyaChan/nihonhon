@@ -637,7 +637,7 @@ body.hide-bottom #navbar.peek {
 
 .flow p {
   margin-bottom: 0.4em;
-  text-indent: var(--content-indent, 1em);
+  text-indent: var(--content-indent, 0em);
 }
 
 /* Картинка вписывается в область чтения: пределы в пикселях задаёт
@@ -665,6 +665,11 @@ body.blur-images .flow svg:not(.revealed) {
 body.blur-images .flow img,
 body.blur-images .flow svg {
   transition: filter 0.2s ease;
+}
+
+/* Идеографический пробел U+3000: при отступе меньше 1em он лишний */
+body.hide-u3000 .flow .u3000 {
+  display: none;
 }
 
 /* Вертикальное письмо: сверху вниз, столбцы справа налево */

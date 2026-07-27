@@ -247,5 +247,5 @@ async function renderEpubChapter(zip, path, pathToIndex) {
     }
   }
 
-  return fragment;
+  return markIdeographicSpaces(fragment);
 }

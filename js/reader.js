@@ -139,6 +139,35 @@ function clearPaginationStyles() {
 }
 
 /**
+ * Оборачивает идеографические пробелы U+3000 в span — их можно скрыть
+ * одним классом на body, когда абзацный отступ задан меньше 1em
+ * (иначе к отступу CSS добавился бы ещё символ шириной в знак).
+ */
+function markIdeographicSpaces(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeValue.includes("　")) targets.push(n);
+  }
+  for (const node of targets) {
+    const frag = document.createDocumentFragment();
+    for (const part of node.nodeValue.split(/(　+)/)) {
+      if (!part) continue;
+      if (part[0] === "　") {
+        const span = document.createElement("span");
+        span.className = "u3000";
+        span.textContent = part;
+        frag.appendChild(span);
+      } else {
+        frag.appendChild(document.createTextNode(part));
+      }
+    }
+    node.parentNode.replaceChild(frag, node);
+  }
+  return root;
+}
+
+/**
  * Ограничение размера картинок в пикселях области чтения. Проценты в CSS
  * тут не годятся: в режиме скролла у контейнера нет заданной высоты, и
  * max-height в процентах просто игнорируется.
