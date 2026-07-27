@@ -494,6 +494,9 @@ function loadBook({ id, title, chapters }) {
 // Показанная глава кладётся в обёртку .chapter-block; при приближении
 // к концу прокрутки дописывается следующая глава.
 
+const LOAD_MARGIN = 600;       // px до края, на котором подгружаем соседнюю главу
+const MAX_LOADED_PAGES = 50;   // сколько страниц держим в DOM одновременно
+
 let scrollLoadedTo = -1; // индекс последней подгруженной главы
 let appendingChapter = false;
 
@@ -512,6 +515,116 @@ async function appendNextChapter() {
     invalidateScrollBreaks(); // разметка потока изменилась
   } finally {
     appendingChapter = false;
+  }
+}
+
+// ---------- подгрузка назад ----------
+// Вставка главы сверху сдвигает весь текст вниз, поэтому прокрутку
+// компенсируем на реальное смещение блока, который был первым.
+
+let scrollLoadedFrom = 0; // индекс первой подгруженной главы
+let prependingChapter = false;
+
+// Координата начала блока вдоль оси чтения
+function blockStartCoord(el) {
+  const r = el.getBoundingClientRect();
+  return verticalMode ? r.right : r.top;
+}
+
+// Возвращает элемент на прежнее место, доводя прокрутку на его смещение
+function keepInPlace(el, coordBefore) {
+  const shift = blockStartCoord(el) - coordBefore;
+  if (!shift) return;
+  if (verticalMode) els.reader.scrollLeft += shift;
+  else els.reader.scrollTop += shift;
+}
+
+async function prependPrevChapter() {
+  if (prependingChapter || scrollLoadedFrom <= 0) return;
+  prependingChapter = true;
+  try {
+    const prev = scrollLoadedFrom - 1;
+    const node = await state.chapters[prev].render();
+    const wrap = document.createElement("div");
+    wrap.className = "chapter-block";
+    wrap.dataset.index = prev;
+    wrap.appendChild(node);
+
+    const anchorEl = els.flow.firstElementChild;
+    const coord = anchorEl ? blockStartCoord(anchorEl) : 0;
+    els.flow.insertBefore(wrap, anchorEl);
+    if (anchorEl) keepInPlace(anchorEl, coord);
+
+    scrollLoadedFrom = prev;
+    invalidateScrollBreaks();
+
+    // Картинки догружаются после вставки и сдвигают текст ещё раз
+    const pending = [...wrap.querySelectorAll("img")].filter((i) => !i.complete);
+    if (pending.length && anchorEl) {
+      const coord2 = blockStartCoord(anchorEl);
+      await Promise.all(pending.map((img) => new Promise((res) => {
+        img.onload = img.onerror = res;
+      })));
+      keepInPlace(anchorEl, coord2);
+      invalidateScrollBreaks();
+    }
+  } finally {
+    prependingChapter = false;
+  }
+}
+
+// ---------- выгрузка дальнего конца ----------
+
+// Сколько страниц сейчас в DOM; null — карта страниц ещё не посчитана
+function loadedPageCount() {
+  if (!pageMap || pageMap.length !== state.chapters.length) return null;
+  let n = 0;
+  for (const wrap of els.flow.children) n += pageMap[Number(wrap.dataset.index)] || 0;
+  return n;
+}
+
+// Насколько блок ушёл за пределы окна; отрицательное — блок ещё виден
+function blockOutsideDistance(el, fromEnd) {
+  const rr = els.reader.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (verticalMode) {
+    // Чтение справа налево: начало окна — правый край, конец — левый
+    return fromEnd ? rr.left - r.right : r.left - rr.right;
+  }
+  return fromEnd ? r.top - rr.bottom : rr.top - r.bottom;
+}
+
+/**
+ * Выгружает главы, пока в DOM больше MAX_LOADED_PAGES страниц: снимается тот
+ * конец, который дальше от окна. Ограниченное окно держит полосу прокрутки
+ * пригодной — иначе она сжимается в нитку по мере загрузки книги.
+ * Трогаем только блоки, ушедшие за окно дальше LOAD_MARGIN, иначе
+ * освободившееся место тут же подгрузится обратно.
+ */
+function trimLoadedChapters() {
+  let pages = loadedPageCount();
+  if (pages === null) return;
+
+  while (pages > MAX_LOADED_PAGES && els.flow.children.length > 1) {
+    const headGap = blockOutsideDistance(els.flow.firstElementChild, false);
+    const tailGap = blockOutsideDistance(els.flow.lastElementChild, true);
+    if (Math.max(headGap, tailGap) <= LOAD_MARGIN) break;
+
+    const fromEnd = tailGap > headGap;
+    const victim = fromEnd ? els.flow.lastElementChild : els.flow.firstElementChild;
+
+    // Удаление блока сверху поднимает текст — держим соседа на месте
+    const anchorEl = fromEnd ? els.flow.firstElementChild : victim.nextElementSibling;
+    const coord = blockStartCoord(anchorEl);
+    const index = Number(victim.dataset.index);
+    revokeBlobUrlsIn(victim);
+    victim.remove();
+    keepInPlace(anchorEl, coord);
+
+    if (fromEnd) scrollLoadedTo = index - 1;
+    else scrollLoadedFrom = index + 1;
+    pages -= pageMap[index] || 0;
+    invalidateScrollBreaks();
   }
 }
 
@@ -641,10 +754,15 @@ let scrollInfoQueued = false;
 els.reader.addEventListener("scroll", () => {
   if (!scrollMode || state.current < 0) return;
   const r = els.reader;
+  // Подгрузка соседней главы + выгрузка дальнего конца
   const nearEnd = verticalMode
-    ? r.scrollWidth - Math.abs(r.scrollLeft) - r.clientWidth < 600
-    : r.scrollHeight - r.scrollTop - r.clientHeight < 600;
-  if (nearEnd) appendNextChapter().then(() => {});
+    ? r.scrollWidth - Math.abs(r.scrollLeft) - r.clientWidth < LOAD_MARGIN
+    : r.scrollHeight - r.scrollTop - r.clientHeight < LOAD_MARGIN;
+  if (nearEnd) appendNextChapter().then(trimLoadedChapters);
+
+  const nearStart =
+    (verticalMode ? Math.abs(r.scrollLeft) : r.scrollTop) < LOAD_MARGIN;
+  if (nearStart) prependPrevChapter().then(trimLoadedChapters);
 
   // Счётчик страниц обновляется в реальном времени (не чаще кадра);
   // поиск по предпосчитанным разрывам дешёвый
@@ -652,7 +770,9 @@ els.reader.addEventListener("scroll", () => {
     scrollInfoQueued = true;
     requestAnimationFrame(() => {
       scrollInfoQueued = false;
-      if (scrollMode && state.current >= 0) updateInfo();
+      if (!scrollMode || state.current < 0) return;
+      trimLoadedChapters(); // держим окно ограниченным и во время прокрутки
+      updateInfo();
     });
   }
 
@@ -669,6 +789,7 @@ async function showChapterScroll(index, anchor) {
   clearPaginationStyles();
   els.flow.innerHTML = "";
   scrollLoadedTo = index - 1;
+  scrollLoadedFrom = index;
   await appendNextChapter();
   await fillViewport();
   els.reader.scrollTop = 0;

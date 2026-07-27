@@ -397,6 +397,8 @@ button:hover {
   display: block;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Прокрутку при вставке главы сверху компенсируем сами (см. keepInPlace) */
+  overflow-anchor: none;
 }
 
 #reader.scroll-h #content {
@@ -412,6 +414,7 @@ button:hover {
   overflow-x: auto;
   overflow-y: hidden;
   writing-mode: vertical-rl;
+  overflow-anchor: none;
 }
 
 #reader.scroll-v #content {
