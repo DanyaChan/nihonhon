@@ -9,6 +9,7 @@ const SETTINGS_DEFAULTS = {
   fg: "#2b2a27",   // должны совпадать с --fg / --bg в style.css
   bg: "#faf7f0",
   width: 760,      // px, --content-width
+  delayedSave: true, // позиция в скролле пишется после 5 с неподвижности
 };
 
 let settings = { ...SETTINGS_DEFAULTS };
@@ -22,6 +23,7 @@ const setFg = $("set-fg");
 const setBg = $("set-bg");
 const setWidth = $("set-width");
 const setWidthVal = $("set-width-val");
+const setDelayedSave = $("set-delayed-save");
 
 function applySettings() {
   const root = document.documentElement.style;
@@ -33,6 +35,7 @@ function applySettings() {
   setBg.value = settings.bg;
   setWidth.value = settings.width;
   setWidthVal.textContent = settings.width + " px";
+  setDelayedSave.checked = settings.delayedSave !== false;
 }
 
 function saveSettings() {
@@ -52,6 +55,8 @@ setFg.addEventListener("input", () => updateSetting("fg", setFg.value));
 setBg.addEventListener("input", () => updateSetting("bg", setBg.value));
 setWidth.addEventListener("input", () =>
   updateSetting("width", Number(setWidth.value)));
+setDelayedSave.addEventListener("change", () =>
+  updateSetting("delayedSave", setDelayedSave.checked));
 
 $("set-reset").addEventListener("click", () => {
   settings = { ...SETTINGS_DEFAULTS };

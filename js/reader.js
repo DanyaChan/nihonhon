@@ -360,29 +360,77 @@ function scrollPageNumber() {
   return page;
 }
 
+// ---------- отображение прогресса ----------
+// Клик по нижней панели переключает режим:
+// 0 — сквозной номер страницы, 1 — глава и страница, 2 — процент книги
+
+let infoMode = 0;
+try { infoMode = parseInt(localStorage.getItem("nihonhon:infoMode")) || 0; } catch {}
+
+function cycleInfoMode() {
+  infoMode = (infoMode + 1) % 3;
+  try { localStorage.setItem("nihonhon:infoMode", infoMode); } catch {}
+  updateInfo();
+}
+
+// Сквозная позиция {current, total} по карте страниц; null, пока не посчитана
+function globalPagePosition() {
+  if (!pageMap || pageMap.length !== state.chapters.length) return null;
+  const total = pageMap.reduce((a, b) => a + b, 0);
+  let current;
+  if (scrollMode) {
+    current = scrollPageNumber();
+  } else {
+    let before = 0;
+    for (let i = 0; i < state.current; i++) before += pageMap[i];
+    current = before + page.current + 1;
+  }
+  if (current == null) return null;
+  return { current: Math.min(current, total), total };
+}
+
 function updateInfo() {
-  // Сквозная нумерация страниц по всей книге, когда она уже посчитана
-  if (pageMap && pageMap.length === state.chapters.length) {
-    const total = pageMap.reduce((a, b) => a + b, 0);
-    let current;
-    if (scrollMode) {
-      current = scrollPageNumber();
-    } else {
+  const pos = globalPagePosition();
+  let text;
+
+  if (infoMode === 2) {
+    // Процент книги
+    text = pos
+      ? Math.round((pos.current / pos.total) * 100) + "%"
+      : Math.round(((state.current + 1) / state.chapters.length) * 100) + "%";
+  } else if (infoMode === 1) {
+    // Глава и страница внутри главы
+    if (pos) {
       let before = 0;
-      for (let i = 0; i < state.current; i++) before += pageMap[i];
-      current = before + page.current + 1;
+      let ch = 0;
+      while (ch < pageMap.length - 1 && before + pageMap[ch] < pos.current) {
+        before += pageMap[ch];
+        ch++;
+      }
+      text = (ch + 1) + "/" + state.chapters.length + "章 ・ " +
+        (pos.current - before) + "/" + pageMap[ch] + "頁";
+    } else {
+      text = (state.current + 1) + " / " + state.chapters.length;
+      if (!scrollMode && page.total > 1) {
+        text += " ・ " + (page.current + 1) + "/" + page.total + "頁";
+      }
     }
-    if (current != null) {
-      els.chapterInfo.textContent = Math.min(current, total) + " / " + total + "頁";
-      return;
+  } else {
+    // Сквозной номер страницы
+    if (pos) {
+      text = pos.current + " / " + pos.total + "頁";
+    } else {
+      text = (state.current + 1) + " / " + state.chapters.length;
+      if (!scrollMode && page.total > 1) {
+        text += " ・ " + (page.current + 1) + "/" + page.total + "頁";
+      }
     }
   }
-  let text = (state.current + 1) + " / " + state.chapters.length;
-  if (!scrollMode && page.total > 1) {
-    text += " ・ " + (page.current + 1) + "/" + page.total + "頁";
-  }
+
   els.chapterInfo.textContent = text;
 }
+
+els.chapterInfo.addEventListener("click", cycleInfoMode);
 
 function savePosition(anchor) {
   try {
@@ -390,6 +438,7 @@ function savePosition(anchor) {
     // В режиме скролла запоминаем абзац у начала видимой области
     if (scrollMode && anchor != null) pos.anchor = anchor;
     localStorage.setItem("nihonhon:" + state.bookId, JSON.stringify(pos));
+    console.debug("[nihonhon] позиция сохранена:", JSON.stringify(pos));
   } catch { /* localStorage недоступен */ }
 }
 
@@ -514,32 +563,81 @@ function scrollToAnchor(anchor) {
   }
 }
 
-// Определяем главу у начала видимой области (для инфо, TOC и сохранения)
-function updateVisibleChapter() {
+// Обёртка главы, в которую попадает начало видимой области
+function visibleChapterWrap() {
   const rr = els.reader.getBoundingClientRect();
   const x = verticalMode ? rr.right - 10 : rr.left + rr.width / 2;
   const y = verticalMode ? rr.top + rr.height / 2 : rr.top + 10;
-  let anchor = null;
   for (const wrap of els.flow.children) {
     const r = wrap.getBoundingClientRect();
     const hit = verticalMode
       ? r.left <= x && x <= r.right
       : r.top <= y && y <= r.bottom;
-    if (hit) {
-      const index = Number(wrap.dataset.index);
-      if (index !== state.current) {
-        state.current = index;
-        setTocActive(index);
-      }
-      anchor = computeAnchor(wrap);
-      break;
+    if (hit) return wrap;
+  }
+  return null;
+}
+
+// Определяем главу у начала видимой области (для инфо и TOC)
+function updateVisibleChapter() {
+  const wrap = visibleChapterWrap();
+  if (wrap) {
+    const index = Number(wrap.dataset.index);
+    if (index !== state.current) {
+      state.current = index;
+      setTocActive(index);
     }
   }
   updateInfo(); // счётчик страниц следует за прокруткой
-  savePosition(anchor);
+
+  // Задержка сохранения выключена — пишем сразу при остановке прокрутки
+  if (settings.delayedSave === false) {
+    savePosition(wrap ? computeAnchor(wrap) : null);
+  }
 }
 
+// ---------- отложенное сохранение позиции при скролле ----------
+// Позиция пишется только когда чтение "устоялось": в течение
+// SAVE_SETTLE_MS прокрутка не ушла дальше SAVE_MOVE_THRESHOLD px.
+// Существенное движение перезапускает отсчёт.
+
+const SAVE_SETTLE_MS = 5000;
+const SAVE_MOVE_THRESHOLD = 200; // px, примерно пара строк
+
+let settleTimer = null;
+let settleOffset = null;
+
+function scrollOffsetNow() {
+  return verticalMode ? Math.abs(els.reader.scrollLeft) : els.reader.scrollTop;
+}
+
+function noteScrollForSave() {
+  if (settings.delayedSave === false) return; // сохраняет updateVisibleChapter
+  const offset = scrollOffsetNow();
+  if (settleTimer !== null &&
+      Math.abs(offset - settleOffset) <= SAVE_MOVE_THRESHOLD) {
+    return; // остаёмся у той же точки — отсчёт продолжается
+  }
+  settleOffset = offset;
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(saveSettledPosition, SAVE_SETTLE_MS);
+}
+
+function saveSettledPosition() {
+  clearTimeout(settleTimer);
+  settleTimer = null;
+  if (!scrollMode || state.current < 0) return;
+  const wrap = visibleChapterWrap();
+  savePosition(wrap ? computeAnchor(wrap) : null);
+}
+
+// Уход со страницы раньше таймера — сохраняем сразу, чтобы не потерять позицию
+window.addEventListener("pagehide", () => {
+  if (settleTimer !== null) saveSettledPosition();
+});
+
 let scrollSaveTimer;
+let scrollInfoQueued = false;
 els.reader.addEventListener("scroll", () => {
   if (!scrollMode || state.current < 0) return;
   const r = els.reader;
@@ -547,6 +645,21 @@ els.reader.addEventListener("scroll", () => {
     ? r.scrollWidth - Math.abs(r.scrollLeft) - r.clientWidth < 600
     : r.scrollHeight - r.scrollTop - r.clientHeight < 600;
   if (nearEnd) appendNextChapter().then(() => {});
+
+  // Счётчик страниц обновляется в реальном времени (не чаще кадра);
+  // поиск по предпосчитанным разрывам дешёвый
+  if (!scrollInfoQueued) {
+    scrollInfoQueued = true;
+    requestAnimationFrame(() => {
+      scrollInfoQueued = false;
+      if (scrollMode && state.current >= 0) updateInfo();
+    });
+  }
+
+  // Сохранение позиции — только когда позиция устоится (см. noteScrollForSave)
+  noteScrollForSave();
+
+  // Определение главы — по-прежнему с дебаунсом
   clearTimeout(scrollSaveTimer);
   scrollSaveTimer = setTimeout(updateVisibleChapter, 200);
 });
