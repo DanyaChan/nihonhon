@@ -628,6 +628,14 @@ function trimLoadedChapters() {
   }
 }
 
+// Обрезка откладывается до паузы в прокрутке: снятие блока сверху правит
+// scrollTop, а это во время инерционного пролистывания гасит инерцию (iOS)
+let scrollTrimTimer;
+function scheduleTrim() {
+  clearTimeout(scrollTrimTimer);
+  scrollTrimTimer = setTimeout(trimLoadedChapters, 200);
+}
+
 // Пока контент короче окна — дозаполняем следующими главами
 async function fillViewport() {
   for (let guard = 0; guard < 50; guard++) {
@@ -758,11 +766,11 @@ els.reader.addEventListener("scroll", () => {
   const nearEnd = verticalMode
     ? r.scrollWidth - Math.abs(r.scrollLeft) - r.clientWidth < LOAD_MARGIN
     : r.scrollHeight - r.scrollTop - r.clientHeight < LOAD_MARGIN;
-  if (nearEnd) appendNextChapter().then(trimLoadedChapters);
+  if (nearEnd) appendNextChapter().then(scheduleTrim);
 
   const nearStart =
     (verticalMode ? Math.abs(r.scrollLeft) : r.scrollTop) < LOAD_MARGIN;
-  if (nearStart) prependPrevChapter().then(trimLoadedChapters);
+  if (nearStart) prependPrevChapter().then(scheduleTrim);
 
   // Счётчик страниц обновляется в реальном времени (не чаще кадра);
   // поиск по предпосчитанным разрывам дешёвый
@@ -770,11 +778,11 @@ els.reader.addEventListener("scroll", () => {
     scrollInfoQueued = true;
     requestAnimationFrame(() => {
       scrollInfoQueued = false;
-      if (!scrollMode || state.current < 0) return;
-      trimLoadedChapters(); // держим окно ограниченным и во время прокрутки
-      updateInfo();
+      if (scrollMode && state.current >= 0) updateInfo();
     });
   }
+
+  scheduleTrim(); // окно обрезается на паузе, а не на каждом кадре
 
   // Сохранение позиции — только когда позиция устоится (см. noteScrollForSave)
   noteScrollForSave();
