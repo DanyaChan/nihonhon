@@ -101,6 +101,7 @@ function applyViewMode() {
   els.reader.classList.toggle("scroll-h", scrollMode && !verticalMode);
   els.reader.classList.toggle("scroll-v", scrollMode && verticalMode);
   $("btn-view").textContent = scrollMode ? "ページ" : "スクロール";
+  updateImageBounds(); // границы картинок зависят от режима
 }
 
 function toggleViewMode() {
@@ -109,6 +110,23 @@ function toggleViewMode() {
   applyViewMode();
   if (state.current >= 0) showChapter(state.current);
 }
+
+/**
+ * Картинку, которую браузер не смог показать (битые данные, неизвестный
+ * формат), убираем: пустая рамка занимает место и сбивает разбивку.
+ * Событие error не всплывает, поэтому слушаем на фазе перехвата.
+ */
+let imgDropTimer;
+document.addEventListener("error", (e) => {
+  const el = e.target;
+  if (!(el instanceof HTMLImageElement) || !el.closest(".flow")) return;
+  const visible = els.flow.contains(el);
+  console.debug("[nihonhon] картинка не загрузилась, пропускаем:", el.src);
+  el.remove();
+  if (!visible || state.current < 0) return; // в скрытом счётчике страниц
+  clearTimeout(imgDropTimer); // битых картинок может быть много подряд
+  imgDropTimer = setTimeout(repaginate, 100);
+}, true);
 
 function clearPaginationStyles() {
   els.flow.style.columnWidth = "";
@@ -120,7 +138,27 @@ function clearPaginationStyles() {
   page.current = 0;
 }
 
+/**
+ * Ограничение размера картинок в пикселях области чтения. Проценты в CSS
+ * тут не годятся: в режиме скролла у контейнера нет заданной высоты, и
+ * max-height в процентах просто игнорируется.
+ */
+function updateImageBounds() {
+  const cs = getComputedStyle(els.content);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const v = pagedViewportSize();
+  // При вертикальном скролле текст растёт вбок и --content-width его не
+  // ограничивает, поэтому по ширине опираемся на само окно чтения
+  const width = scrollMode && verticalMode
+    ? els.reader.clientWidth - padX
+    : v.width;
+  const root = document.documentElement.style;
+  root.setProperty("--img-max-w", Math.max(50, width) + "px");
+  root.setProperty("--img-max-h", Math.max(50, v.height) + "px");
+}
+
 function paginate() {
+  updateImageBounds(); // до замеров: размер картинок влияет на число страниц
   const cs = getComputedStyle(els.content);
   const width = els.content.clientWidth
     - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
@@ -263,6 +301,7 @@ function pagedViewportSize() {
 function repaginate() {
   if (scrollMode) {
     // Браузер сам переверстает текст, но карту страниц надо обновить
+    updateImageBounds();
     invalidateScrollBreaks();
     const v = pagedViewportSize();
     schedulePageMap(v.width, v.height);

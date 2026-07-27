@@ -23,6 +23,7 @@ html, body {
 }
 
 body {
+  position: relative; /* якорь для панелей в режиме автоскрытия */
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -109,6 +110,58 @@ button:hover {
 
 #toolbar button#btn-toc:hover::after {
   left: 0;
+  transform: none;
+}
+
+/* ---------- автоскрытие панелей ---------- */
+
+/* Панель уезжает за край и не занимает места: она вне потока, поэтому
+   выезд по наведению не меняет вёрстку и не требует переразбивки страниц */
+.edge-zone {
+  display: none;
+}
+
+body.hide-top #edge-top,
+body.hide-bottom #edge-bottom {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 22px;
+  z-index: 88;
+}
+
+#edge-top { top: 0; }
+#edge-bottom { bottom: 0; }
+
+body.hide-top #toolbar,
+body.hide-bottom #navbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  transition: transform 0.18s ease;
+}
+
+body.hide-top #toolbar {
+  top: 0;
+  transform: translateY(-100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+body.hide-bottom #navbar {
+  bottom: 0;
+  transform: translateY(100%);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.15);
+}
+
+/* Показ: курсор на краевой полоске, на самой панели или тап по краю (.peek) */
+body.hide-top #edge-top:hover ~ #toolbar,
+body.hide-top #toolbar:hover,
+body.hide-top #toolbar.peek,
+body.hide-bottom #edge-bottom:hover ~ #navbar,
+body.hide-bottom #navbar:hover,
+body.hide-bottom #navbar.peek {
   transform: none;
 }
 
@@ -503,12 +556,19 @@ button:hover {
   text-indent: 1em;
 }
 
+/* Картинка вписывается в область чтения: пределы в пикселях задаёт
+   updateImageBounds() — проценты не работают там, где у контейнера
+   высота не задана (режим скролла) */
 .flow img, .flow svg {
-  max-width: 100%;
-  max-height: 95%;
+  max-width: min(100%, var(--img-max-w, 100%));
+  max-height: var(--img-max-h, 80vh);
+  width: auto;
   height: auto;
+  object-fit: contain;
   display: block;
-  margin: 0.5em auto;
+  /* Логические отступы: при вертикальном письме центрируют по своей оси */
+  margin-block: 0.5em;
+  margin-inline: auto;
 }
 
 /* Вертикальное письмо: сверху вниз, столбцы справа налево */

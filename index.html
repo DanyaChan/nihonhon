@@ -11,6 +11,10 @@
 </head>
 <body>
 
+  <!-- Полоски у краёв: наведение на них выдвигает скрытую панель.
+       Стоят перед своими панелями — CSS показывает панель через ~ -->
+  <div id="edge-top" class="edge-zone"></div>
+
   <header id="toolbar">
     <button id="btn-toc" data-tip="Оглавление и закладки" aria-label="Оглавление и закладки">☰</button>
     <span id="book-title">日本本</span>
@@ -34,6 +38,15 @@
       </label>
       <label>Сохранять позицию с задержкой
         <input type="checkbox" id="set-delayed-save">
+      </label>
+      <label>Размывать картинки до клика
+        <input type="checkbox" id="set-blur-images">
+      </label>
+      <label>Скрывать верхнюю панель
+        <input type="checkbox" id="set-hide-top">
+      </label>
+      <label>Скрывать нижнюю панель
+        <input type="checkbox" id="set-hide-bottom">
       </label>
       <button id="set-reset">Сбросить</button>
     </div>
@@ -76,6 +89,8 @@
       <div id="lib-grid"></div>
     </div>
   </div>
+
+  <div id="edge-bottom" class="edge-zone"></div>
 
   <footer id="navbar" class="hidden">
     <button id="btn-prev">← 前へ</button>
