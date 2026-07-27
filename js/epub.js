@@ -31,23 +31,16 @@ const MIME_BY_EXT = {
 
 // ---------- открытие книги ----------
 
-async function openEpub(file) {
-  const zip = new ZipArchive(await file.arrayBuffer());
-
-  // 1. container.xml -> путь к OPF
+/** container.xml -> OPF: документ, его путь и разобранный manifest. */
+async function readOpf(zip) {
   const containerXml = await zip.extractText("META-INF/container.xml");
   const container = new DOMParser().parseFromString(containerXml, "application/xml");
   const rootfile = container.querySelector("rootfile");
   if (!rootfile) throw new Error("Некорректный EPUB: нет rootfile в container.xml");
   const opfPath = rootfile.getAttribute("full-path");
 
-  // 2. OPF: метаданные, manifest, spine
   const opfXml = await zip.extractText(opfPath);
   const opf = new DOMParser().parseFromString(opfXml, "application/xml");
-
-  const title =
-    opf.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "title")[0]
-      ?.textContent?.trim() || file.name.replace(/\.epub$/i, "");
 
   const manifest = new Map(); // id -> { path, type, properties }
   for (const item of opf.querySelectorAll("manifest > item")) {
@@ -57,6 +50,16 @@ async function openEpub(file) {
       properties: item.getAttribute("properties") || "",
     });
   }
+  return { opf, opfPath, manifest };
+}
+
+async function openEpub(file) {
+  const zip = new ZipArchive(await file.arrayBuffer());
+  const { opf, opfPath, manifest } = await readOpf(zip);
+
+  const title =
+    opf.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", "title")[0]
+      ?.textContent?.trim() || file.name.replace(/\.epub$/i, "");
 
   const spinePaths = [];
   for (const ref of opf.querySelectorAll("spine > itemref")) {
@@ -74,7 +77,53 @@ async function openEpub(file) {
     render: () => renderEpubChapter(zip, path, pathToIndex),
   }));
 
-  loadBook({ id: "epub:" + file.name + ":" + file.size, title, chapters });
+  loadBook({
+    id: "epub:" + file.name + ":" + file.size,
+    title,
+    chapters,
+    cover: await extractEpubCover(zip, opf, manifest),
+  });
+}
+
+// ---------- обложка ----------
+
+/**
+ * Ищет обложку: EPUB3 properties="cover-image", EPUB2 <meta name="cover">,
+ * иначе любая картинка со словом cover в пути. Возвращает Blob или null.
+ */
+async function extractEpubCover(zip, opf, manifest) {
+  const usable = (m) => m && m.type.startsWith("image/") && zip.has(m.path);
+  const items = [...manifest.values()];
+
+  let item = items.find((m) => m.properties.includes("cover-image") && usable(m));
+  if (!item) {
+    const metaId = opf.querySelector('meta[name="cover"]')?.getAttribute("content");
+    const byMeta = manifest.get(metaId);
+    if (usable(byMeta)) item = byMeta;
+  }
+  if (!item) item = items.find((m) => usable(m) && /cover/i.test(m.path));
+  if (!item) return null;
+
+  try {
+    const ext = item.path.split(".").pop().toLowerCase();
+    return new Blob([await zip.extract(item.path)],
+      { type: MIME_BY_EXT[ext] || item.type });
+  } catch (e) {
+    console.warn("Не удалось прочитать обложку:", e);
+    return null;
+  }
+}
+
+/** Обложка книги, уже лежащей в хранилище (файл ещё не открыт). */
+async function epubCoverFromFile(file) {
+  try {
+    const zip = new ZipArchive(await file.arrayBuffer());
+    const { opf, manifest } = await readOpf(zip);
+    return await extractEpubCover(zip, opf, manifest);
+  } catch (e) {
+    console.warn("Не удалось разобрать книгу ради обложки:", e);
+    return null;
+  }
 }
 
 // ---------- оглавление ----------

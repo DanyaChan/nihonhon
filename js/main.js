@@ -12,7 +12,9 @@ async function openFile(file) {
     if (/\.epub$/i.test(file.name)) await openEpub(file);
     else if (/\.txt$/i.test(file.name)) await openTxt(file);
     else { alert("Поддерживаются только .epub и .txt"); return; }
-    recordRecent(file); // библиотека: недавние + файл в IndexedDB
+    // библиотека: недавние + файл и обложка в IndexedDB (ждём, иначе
+    // полка, открытая сразу после, не найдёт записи книги)
+    await recordRecent(file);
   } catch (e) {
     console.error(e);
     alert("Не удалось открыть книгу: " + e.message);
@@ -53,6 +55,7 @@ window.addEventListener("resize", () => {
 // местами: ← — вперёд, → — назад.
 document.addEventListener("keydown", (e) => {
   if (state.current < 0 || scrollMode) return; // в скролле листает браузер
+  if (libraryOpen()) return; // открыта полка — книгу не листаем
   // Комбинации с модификаторами (Cmd+← и т.п.) — браузеру
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   // Фокус в элементах управления (ползунок, пикеры, кнопки) — им

@@ -22,11 +22,6 @@
     <button id="btn-open" data-tip="Открыть книгу (.epub / .txt)" aria-label="Открыть книгу">📖 Открыть</button>
     <input type="file" id="file-input" accept=".epub,.txt" hidden>
 
-    <div id="recent-menu" class="hidden">
-      <h3>Недавние книги</h3>
-      <ul id="recent-list"></ul>
-    </div>
-
     <div id="settings" class="hidden">
       <label>Цвет текста <input type="color" id="set-fg"></label>
       <label>Цвет фона <input type="color" id="set-bg"></label>
@@ -65,6 +60,18 @@
         <div id="flow" class="flow"></div>
       </div>
     </main>
+  </div>
+
+  <div id="library-modal" class="hidden">
+    <div class="lib-backdrop"></div>
+    <div class="lib-dialog" role="dialog" aria-label="Недавние книги">
+      <header class="lib-head">
+        <h2>本棚 — недавние книги</h2>
+        <button id="lib-open">📖 Открыть файл</button>
+        <button id="lib-close" aria-label="Закрыть">✕</button>
+      </header>
+      <div id="lib-grid"></div>
+    </div>
   </div>
 
   <footer id="navbar" class="hidden">

@@ -11,6 +11,7 @@ const state = {
   title: "",
   chapters: [],        // [{ title, render: () => Promise<Node> }]
   current: -1,
+  cover: null,         // Blob обложки, если книга её содержит
   blobUrls: [],        // для очистки при открытии новой книги
 };
 
@@ -444,7 +445,7 @@ function savePosition(anchor) {
 
 // ---------- загрузка книги и глав ----------
 
-function loadBook({ id, title, chapters }) {
+function loadBook({ id, title, chapters, cover = null }) {
   // Чистим blob-URL прошлой книги
   state.blobUrls.forEach((u) => URL.revokeObjectURL(u));
   state.blobUrls = [];
@@ -453,6 +454,7 @@ function loadBook({ id, title, chapters }) {
   state.title = title;
   state.chapters = chapters;
   state.current = -1;
+  state.cover = cover;
 
   els.bookTitle.textContent = title;
   document.title = title + " — 日本本";
