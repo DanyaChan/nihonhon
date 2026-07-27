@@ -571,6 +571,18 @@ body.hide-bottom #navbar.peek {
   margin-inline: auto;
 }
 
+/* Картинки под спойлером: размыты, пока по ним не кликнешь */
+body.blur-images .flow img:not(.revealed),
+body.blur-images .flow svg:not(.revealed) {
+  filter: blur(64px);
+  cursor: pointer;
+}
+
+body.blur-images .flow img,
+body.blur-images .flow svg {
+  transition: filter 0.2s ease;
+}
+
 /* Вертикальное письмо: сверху вниз, столбцы справа налево */
 .flow.vertical {
   writing-mode: vertical-rl;

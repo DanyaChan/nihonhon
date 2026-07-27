@@ -12,6 +12,7 @@ const SETTINGS_DEFAULTS = {
   delayedSave: true, // позиция в скролле пишется после 5 с неподвижности
   hideTop: false,    // верхняя панель выезжает по наведению на край
   hideBottom: false, // то же для нижней
+  blurImages: false, // картинки размыты, пока не кликнешь по ним
 };
 
 let settings = { ...SETTINGS_DEFAULTS };
@@ -28,6 +29,7 @@ const setWidthVal = $("set-width-val");
 const setDelayedSave = $("set-delayed-save");
 const setHideTop = $("set-hide-top");
 const setHideBottom = $("set-hide-bottom");
+const setBlurImages = $("set-blur-images");
 
 function applySettings() {
   const root = document.documentElement.style;
@@ -37,6 +39,7 @@ function applySettings() {
 
   document.body.classList.toggle("hide-top", !!settings.hideTop);
   document.body.classList.toggle("hide-bottom", !!settings.hideBottom);
+  document.body.classList.toggle("blur-images", !!settings.blurImages);
 
   setFg.value = settings.fg;
   setBg.value = settings.bg;
@@ -45,6 +48,7 @@ function applySettings() {
   setDelayedSave.checked = settings.delayedSave !== false;
   setHideTop.checked = !!settings.hideTop;
   setHideBottom.checked = !!settings.hideBottom;
+  setBlurImages.checked = !!settings.blurImages;
 }
 
 function saveSettings() {
@@ -73,6 +77,16 @@ setHideTop.addEventListener("change", () =>
   updateSetting("hideTop", setHideTop.checked));
 setHideBottom.addEventListener("change", () =>
   updateSetting("hideBottom", setHideBottom.checked));
+setBlurImages.addEventListener("change", () =>
+  updateSetting("blurImages", setBlurImages.checked));
+
+// Клик по размытой картинке открывает её (повторный — снова прячет).
+// Снятие размытия живёт до перерисовки главы.
+els.flow.addEventListener("click", (e) => {
+  if (!settings.blurImages) return;
+  const img = e.target.closest("img, svg");
+  if (img) img.classList.toggle("revealed");
+});
 
 // Тачскрин: наведения нет, поэтому панель выдвигается тапом по краю
 for (const [zoneId, panelId] of [["edge-top", "toolbar"],
